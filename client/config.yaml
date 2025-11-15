@@ -1,7 +1,7 @@
 mosquitto_port: 1884
 broadcast_port: 50001
 broadcast_mask: "255.255.255.255"
-peer_ip: "172.31.1.69"
+peer_ip: "172.31.1.143"
 
 # TODO: add topics
 agg_topic: "agg/"

@@ -6,7 +6,7 @@ import json
 # TODO: adcionar subscribe ao agg/
 
 class Aggregator:
-
+ 
     def __init__(self):
 
         with open("client/config.yaml", "r") as file:
@@ -52,7 +52,7 @@ class Aggregator:
             qos=1,
         )
         # TODO: add subscribe do update via MQTT to train/
-        self.mqtt_com.subscribe(topic="agg/#")
+        self.remote_params = self.mqtt_com.subscribe(topic="agg/#")
 
     def aggregate(self, params_list, method):
         """

@@ -67,14 +67,12 @@ class Communication_Layer:
             print(f"[{self.client_id}] Failed to publish to {full_topic}")
 
     def subscribe(self, topic):
-        def on_message(client, userdata, msg):
-            if msg.topic.startswith(f"{self.client_id}/"):
-                return
-            try:
-                data = json.loads(msg.payload.decode())
-            except json.JSONDecodeError:
-                data = msg.payload.decode()
-            print(f"[{self.client_id}] RECEIVED on {msg.topic}: {data}")
-
+        # def on_message(client, userdata, msg):
+        #     if msg.topic.startswith(f"{self.client_id}/"):
+        #         return
+        #     data = json.loads(msg.payload.decode())
+        #     print(f"[{self.client_id}] RECEIVED on {msg.topic}: {data}")
+        #     return data
         self.client.subscribe(topic, qos=self.qos)
-        self.client.on_message = on_message
+        print("Recebeu algo")
+        #self.client.on_message = on_message
