@@ -30,32 +30,32 @@ services:
 
 # Implementado novo
 
-  pipeline:
-    build: ./pipeline_layer
-    container_name: pipeline
-    network_mode: "host"
-    depends_on:
-      broker:
-        condition: service_started
-      peer:
-        condition: service_started
-    volumes:
-      - ./client:/app/client
-      - ./pipeline_layer:/app
-      - ./mosquitto:/app/mosquitto
-      - /var/run/docker.sock:/var/run/docker.sock
+  # pipeline:
+  #   build: ./pipeline_layer
+  #   container_name: pipeline
+  #   network_mode: "host"
+  #   depends_on:
+  #     broker:
+  #       condition: service_started
+  #     peer:
+  #       condition: service_started
+  #   volumes:
+  #     - ./client:/app/client
+  #     - ./pipeline_layer:/app
+  #     - ./mosquitto:/app/mosquitto
+  #     - /var/run/docker.sock:/var/run/docker.sock
 
-  aggregation:
-    build: ./aggregation_layer
-    container_name: aggregation
-    network_mode: "host"
-    depends_on:
-      broker:
-        condition: service_started
-      peer:
-        condition: service_started
-    volumes:
-      - ./client:/app/client
-      - ./aggregation_layer:/app
-      - ./mosquitto:/app/mosquitto
-      - /var/run/docker.sock:/var/run/docker.sock
+  # aggregation:
+  #   build: ./aggregation_layer
+  #   container_name: aggregation
+  #   network_mode: "host"
+  #   depends_on:
+  #     broker:
+  #       condition: service_started
+  #     peer:
+  #       condition: service_started
+  #   volumes:
+  #     - ./client:/app/client
+  #     - ./aggregation_layer:/app
+  #     - ./mosquitto:/app/mosquitto
+  #     - /var/run/docker.sock:/var/run/docker.sock

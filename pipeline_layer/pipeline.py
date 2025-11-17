@@ -109,7 +109,7 @@ class Model_Manager:
         }
         # TODO: publish best_params via MQTT to agg/
         self.mqtt_com.publish(
-            payload=trained_params_payload, topic=f"agg/{self.broker_id}"
+            payload=trained_params_payload, topic=f"{self.broker_id}/agg/"
         )
         train_acc, test_acc = self.evaluate(
             self.best_model, X_train, X_test, y_train, y_test
@@ -118,6 +118,6 @@ class Model_Manager:
         print(f"Train Accuracy: {train_acc:.4f}, Test Accuracy: {test_acc:.4f}")
 
 
-if __name__ == "__main__":
+if __name__ == "__main__": 
     manager = Model_Manager()
     manager.run_pipeline()

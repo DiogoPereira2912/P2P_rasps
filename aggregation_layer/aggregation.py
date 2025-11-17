@@ -13,7 +13,7 @@ class Aggregator:
             self.config = load(file, Loader=Loader)
 
         # TODO adicionar base_topic para depois meter nas bridges dinamicas
-
+ 
         self.mosquitto_port = self.config["mosquitto_port"]
         self.broadcast_port = self.config["broadcast_port"]
         self.broadcast_mask = self.config["broadcast_mask"]
@@ -82,6 +82,3 @@ if __name__ == "__main__":
     aggregator.mqtt_com.publish(
         payload=agg_params_payload, topic=f"train/{aggregator.broker_id}"
     )
-
-    aggregated_params_majority = aggregator.aggregate(best_params, method="majority")
-    print("Aggregated Parameters (Majority):", aggregated_params_majority)

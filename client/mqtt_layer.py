@@ -1,4 +1,4 @@
-import json
+import json, queue
 from paho.mqtt import client as mqtt_client
 
 class Communication_Layer:
@@ -67,12 +67,11 @@ class Communication_Layer:
             print(f"[{self.client_id}] Failed to publish to {full_topic}")
 
     def subscribe(self, topic):
-        # def on_message(client, userdata, msg):
-        #     if msg.topic.startswith(f"{self.client_id}/"):
-        #         return
-        #     data = json.loads(msg.payload.decode())
-        #     print(f"[{self.client_id}] RECEIVED on {msg.topic}: {data}")
-        #     return data
+        def on_message(client, userdata, msg):
+            if msg.topic.startswith(f"{self.client_id}/"):
+                return
+            data = json.loads(msg.payload.decode())
+            print(f"[{self.client_id}] RECEIVED on {msg.topic}: {data}")
+            return data
         self.client.subscribe(topic, qos=self.qos)
-        print("Recebeu algo")
-        #self.client.on_message = on_message
+        self.client.on_message = on_message

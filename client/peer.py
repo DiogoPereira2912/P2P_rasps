@@ -158,4 +158,4 @@ class Peer:
 
 if __name__ == "__main__":
     peer = Peer()
-    #peer.data_publisher()
+    peer.data_publisher()
