@@ -101,6 +101,7 @@ class Peer:
     address {remote_peer_ip}:{remote_peer_port}
     topic {self.broker_id}/# out 1 {self.prefix}
     topic {remote_peer_id}/# in 1
+    topic {remote_peer_id}/# out 1
                 """
 
             with open("./mosquitto/conf.d/bridges.conf", "a") as f:
@@ -147,7 +148,7 @@ class Peer:
         ip_list = sorted([p[0] for p in self.known_peers])
         known_peers_payload = json.dumps(ip_list)
         self.mqtt_com.client.publish(payload = known_peers_payload, topic = "system/peers", retain=True)
-        print(f"[SYSTEM] Lista de peers atualizada e publicada: {ip_list}")
+        print(f"Lista de peers atualizada: {ip_list}")
 
 if __name__ == "__main__":
     peer = Peer()

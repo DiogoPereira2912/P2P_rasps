@@ -1,4 +1,4 @@
-from data_utils import build_param_grid, data_split, load_data
+from data_utils import build_param_grid, data_split, load_data, resolve_targets_by_index
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import Pipeline
@@ -127,9 +127,13 @@ class Model_Manager:
             "id": self.peer_ip,
             "trained_params": self.best_params,
         }
-        self.mqtt_com.publish(
-            payload=trained_params_payload, topic=f"{self.broker_id}/agg"
-        )
+        targets = resolve_targets_by_index(self.current_peer_list, self.pipeline_dest_indices)
+        if not targets:
+            self.mqtt_com.publish(trained_params_payload, topic=f"{self.broker_id}/agg")
+        else:
+            for ip in targets:
+                target_id = ip.replace(".", "_")
+                self.mqtt_com.publish(trained_params_payload, topic=f"{target_id}/agg")
         train_acc, test_acc = self.evaluate(
             self.best_model, self.X_train, self.X_test, self.y_train, self.y_test
         )

@@ -8,4 +8,4 @@ central_server: "172.31.1.143"
 
 routing_topology:
   aggregation_topology: [0]
-  pipeline_topology: [1]
+  pipeline_topology: [0]

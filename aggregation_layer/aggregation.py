@@ -5,7 +5,7 @@ import json, threading, time, uuid
 import warnings
 warnings.filterwarnings("ignore")
 
-# TODO: adcionar subscribe ao agg/
+from aggregation_algs.aggregation_utils import resolve_targets_by_index
 
 class Aggregator:
  
@@ -55,8 +55,12 @@ class Aggregator:
             base_topic="",
             qos=1,
         )
-        # TODO: add subscribe do update via MQTT to train/
         self.remote_params = self.mqtt_com.subscribe(topic=subscribe_topic)
+        self.mqtt_com.subscribe("system/peers")
+
+    def _start_agg_worker(self):
+        agg_thread = threading.Thread(target=self.agg_worker)
+        agg_thread.start()
 
     def aggregate(self, params_dict, method):
         """
@@ -81,29 +85,36 @@ class Aggregator:
         """
         while True:
             topic, data = self.mqtt_com.msg_queue.get()
-            print(f"[{self.broker_id}] RECEIVED on {topic}: {data}")
-            if "trained_params" not in data:
+
+            if topic == "system/peers":
+                print(f"[{self.broker_id}] RECEIVED on {topic}: {data}")
+                self.current_peer_list = data
+                print(f"[AGGREGATION] Lista de peers atualizada: {self.current_peer_list}")
                 self.mqtt_com.msg_queue.task_done()
                 continue
+            else:    
+                print(f"[{self.broker_id}] RECEIVED on {topic}: {data}")
+                if "trained_params" not in data:
+                    self.mqtt_com.msg_queue.task_done()
+                    continue
 
-            node_id = data["id"]
-            params = data["trained_params"]
-            self.remote_params[node_id] = params
-            aggregated_params = self.aggregate(self.remote_params, method="avg")
-            payload = {
-                "id": self.broker_id,
-                "agg_params": aggregated_params
-            }
-            print("Aggregated Params", payload)
-            self.mqtt_com.publish(
-                payload=payload,
-                topic=f"{self.broker_id}/train"
-            )
-            self.mqtt_com.msg_queue.task_done()
-
-    def _start_agg_worker(self):
-        agg_thread = threading.Thread(target=self.agg_worker)
-        agg_thread.start()
+                node_id = data["id"]
+                params = data["trained_params"]
+                self.remote_params[node_id] = params
+                aggregated_params = self.aggregate(self.remote_params, method="avg")
+                payload = {
+                    "id": self.broker_id,
+                    "agg_params": aggregated_params
+                }
+                print("Aggregated Params", payload)
+                targets = resolve_targets_by_index(self.current_peer_list, self.aggregation_dest_indices)
+                if not targets:
+                    self.mqtt_com.publish(payload, topic=f"{self.broker_id}/train")
+                else:
+                    for ip in targets:
+                        target_id = ip.replace(".", "_")
+                        self.mqtt_com.publish(payload, topic=f"{target_id}/train")
+                self.mqtt_com.msg_queue.task_done()
 
 if __name__ == "__main__":
     aggregator = Aggregator()
