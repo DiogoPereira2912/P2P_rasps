@@ -3,9 +3,10 @@ broadcast_port: 50001
 broadcast_mask: "255.255.255.255"
 peer_ip: "172.31.1.143"
 
-mode: "gossip" # "federated" 
-central_server: "172.31.1.143"
+node_id: 0
+mode: "gossip" #"federated" #"gossip" 
+central_id: 0
 
 routing_topology:
-  aggregation_topology: [0]
-  pipeline_topology: [0]
+  aggregation_topology: [1, 2]
+  pipeline_topology: [1, 2]

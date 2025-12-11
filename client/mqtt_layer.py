@@ -31,33 +31,45 @@ class Communication_Layer:
         client_id: identificador MQTT
         base_topic: prefixo base para publicação
         qos: qualidade do serviço MQTT
-        """
+        """ 
         self.client_id = client_id
         self.topic_broker_id = broker.replace(".", "_")
         self.base_topic = base_topic
         self.qos = qos
+        
         self.msg_queue = queue.Queue()
+        self.subscribed_topics = []
+
         self.client = self._connect_mqtt(broker, port, user, pwd)
         self.client.loop_start()
         self.client.on_message = self.on_message
 
-
     def _connect_mqtt(self, broker, port, user, pwd):
         def on_connect(client, userdata, flags, rc):
             if rc == 0:
-                print(f"[{self.client_id}] Connected to {broker}:{port}")
+                print(f"[{self.client_id}] Ligado ao Broker!")
+                for topic in self.subscribed_topics:
+                    client.subscribe(topic, qos=self.qos)
+                    print(f"[{self.client_id}] Re-subscrevi: {topic}")
             else:
-                print(f"[{self.client_id}] Connection failed with code {rc}")
+                print(f"[{self.client_id}] Falha na ligação, rc={rc}")
 
         def on_disconnect(client, userdata, rc):
-            print(f"[{self.client_id}] Disconnected, rc={rc}")
+            print(f"[{self.client_id}] Desligado (rc={rc}). A tentar reconectar...")
 
         client = mqtt_client.Client(client_id=self.client_id)
         if user and pwd:
             client.username_pw_set(user, pwd)
         client.on_connect = on_connect
         client.on_disconnect = on_disconnect
-        client.connect(broker, port)
+        
+        while True:
+            try:
+                client.connect(broker, port)
+                break
+            except Exception as e:
+                print(f"[{self.client_id}] Broker em baixo... a tentar em 2s.")
+                time.sleep(2)
         return client
 
     def disconnect(self):
@@ -82,7 +94,8 @@ class Communication_Layer:
         self.msg_queue.put((msg.topic, data)) 
 
     def subscribe(self, topic):
-        '''
-        Subscreve um tópico MQTT.
-        '''
-        self.client.subscribe(topic, qos=self.qos)
+            if topic not in self.subscribed_topics:
+                self.subscribed_topics.append(topic)
+            
+            if self.client.is_connected():
+                self.client.subscribe(topic, qos=self.qos)
