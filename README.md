@@ -7,6 +7,9 @@
 
 
 ## TODO
-
--> Testado a forma de decisão entre parametros(hybrid)
 -> Integrar com NNs, e tentar integrar com o projeto da segurança (YOLO)
+
+## CHECKPOINT
+
+-> Infraestrutura testada
+-> Alterar camada para integração com DL models
