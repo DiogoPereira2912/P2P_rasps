@@ -6,6 +6,7 @@ peer_ip: "172.31.1.143"
 node_id: 0
 mode: "gossip" #"federated" #"gossip" 
 central_id: 0
+min_peers: 1
 
 routing_topology:
   aggregation_topology: [1, 2]

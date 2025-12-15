@@ -31,6 +31,7 @@ class Aggregator:
         self.server_id = None # replace de . por _ para estar de acordo com a bridge
 
         self.current_peer_list = []
+        self.min_peers = self.config["min_peers"]
         self.aggregation_dest_indices = self.config["routing_topology"]["aggregation_topology"]
 
         self.last_ts = None
@@ -122,6 +123,12 @@ class Aggregator:
             
             if topic == "system/peers":
                 self.current_peer_list = first_data
+                print("PEERS CONHECIDOS:", len(self.current_peer_list))
+                print("PEERS NECESSÁRIOS:", self.min_peers)
+                self.mqtt_com.msg_queue.task_done()
+                continue
+
+            if len(self.current_peer_list) < self.min_peers:
                 self.mqtt_com.msg_queue.task_done()
                 continue
 

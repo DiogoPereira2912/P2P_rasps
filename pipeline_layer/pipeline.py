@@ -34,6 +34,7 @@ class Model_Manager:
         self.current_round = 0
         self.is_training = False
         self.current_peer_list = []
+        self.min_peers = self.config["min_peers"]
         self.pipeline_dest_indices = self.config["routing_topology"]["pipeline_topology"]
 
         self.df = load_data()
@@ -46,7 +47,7 @@ class Model_Manager:
             self.config_param = load(file, Loader=Loader)
 
         self.param_grid = build_param_grid(self.config_param["param_grid"])
-        threading.Thread(target=self.run_pipeline).start()
+        # threading.Thread(target=self.run_pipeline).start()
         self.best_model = None
         self.best_params = None
 
@@ -226,31 +227,39 @@ class Model_Manager:
             if topic == "system/peers":
                 self.current_peer_list = data
                 print(f"[PIPELINE] Lista de peers atualizada: {self.current_peer_list}")
+                print("PEERS CONHECIDOS:", len(self.current_peer_list))
+                print("PEERS NECESSÁRIOS:", self.min_peers)
                 if self.mode == "federated":
                     self._verify_central_server(self.current_peer_list)
+
+                if len(self.current_peer_list) >= self.min_peers and not self.is_training:
+                    # garante que só arranca o 1o treino quando tiver peers suficientes
+                    self.is_training = True 
+                    threading.Thread(target=self.run_pipeline).start() # arranca o 1o treino
                 self.mqtt_com.msg_queue.task_done()
                 continue
+
             else:
+                if len(self.current_peer_list) >= self.min_peers:
+                    node_id = data["id"]
+                    new_params = data['agg_params']
+                    msg_ts = data["ts"]
 
-                node_id = data["id"]
-                new_params = data['agg_params']
-                msg_ts = data["ts"]
+                    if node_id in last_processed_ts and msg_ts <= last_processed_ts[node_id]:
+                        self.mqtt_com.msg_queue.task_done()
+                        continue
+                    last_processed_ts[node_id] = msg_ts
 
-                if node_id in last_processed_ts and msg_ts <= last_processed_ts[node_id]:
+                    if self.is_training:
+                        print(f"[{self.broker_id}] Já está em treino.")
+                        self.mqtt_com.msg_queue.task_done()
+                        continue
+                    print(f"[{self.broker_id}] RECEIVED on {topic}: {data}")
+
+                    self.param_grid = self.create_adaptive_grid(new_params)
+                    self.is_training = True
+                    self.run_pipeline()
                     self.mqtt_com.msg_queue.task_done()
-                    continue
-                last_processed_ts[node_id] = msg_ts
-
-                if self.is_training:
-                    print(f"[{self.broker_id}] Já está em treino.")
-                    self.mqtt_com.msg_queue.task_done()
-                    continue
-                print(f"[{self.broker_id}] RECEIVED on {topic}: {data}")
-
-                self.param_grid = self.create_adaptive_grid(new_params)
-                self.is_training = True
-                self.run_pipeline()
-                self.mqtt_com.msg_queue.task_done()
 
     def _start_pipe_worker(self):
         '''
