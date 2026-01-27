@@ -128,7 +128,7 @@ class Aggregator:
                 self.mqtt_com.msg_queue.task_done()
                 continue
 
-            if len(self.current_peer_list) < self.min_peers:
+            if len(self.current_peer_list) < self.min_peers: 
                 self.mqtt_com.msg_queue.task_done()
                 continue
 

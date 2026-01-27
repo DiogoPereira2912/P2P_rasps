@@ -1,0 +1,12 @@
+video_path: 
+          - /dev/video0
+          - /dev/video2
+resolution:
+  height: 1920
+  width: 1080 
+anonymous: true
+tb_ip: "172.31.1.104"
+tb_token: "nA4R97GxV2WHx3ScNxHT" # criar device para cada rasp na dashboard dps e alterar token
+test_ip: "demo.thingsboard.io"
+test_token: "x3idotgrwwr9kc32mfxr"
+device_id: "rasp1" 

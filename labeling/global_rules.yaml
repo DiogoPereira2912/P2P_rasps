@@ -1,0 +1,50 @@
+regras:
+
+  - nome: "Operacao Grua"
+    label: "PERIGO_GRUA"
+    prioridade: 1
+    condicoes:
+      rasp1: 1
+      rasp2: 1
+      rasp3: 1
+
+  - nome: "Possível Queda"
+    label: "QUEDA_DETETADA"
+    prioridade: 2
+    condicoes:
+      rasp1: 1
+      rasp2: 1
+      rasp3: 1
+
+
+  - nome: "Pedido de Auxílio"
+    label: "SINAL_SOS"
+    prioridade: 3
+    condicoes:
+      rasp1: 1
+      rasp2: 1
+      rasp3: 1
+
+  - nome: "Acesso a Corredor Logístico"
+    label: "ZONA_FORKLIFT"
+    prioridade: 4
+    condicoes:
+      rasp1: 1
+      rasp2: 1
+      rasp3: 1
+
+  - nome: "Interação Proibida"
+    label: "PROXIMIDADE_MAQUINA"
+    prioridade: 5
+    condicoes:
+      rasp1: 1
+      rasp2: 1
+      rasp3: 1
+
+  - nome: "Zona de Perigo"
+    label: "INTRUSAO"
+    prioridade: 6
+    condicoes:
+      rasp1: 1
+      rasp2: 1
+      rasp3: 1

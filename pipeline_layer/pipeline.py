@@ -11,10 +11,10 @@ warnings.filterwarnings("ignore")
 
 from client.mqtt_layer import Communication_Layer
 
-
+ 
 class Model_Manager:
 
-    def __init__(self):
+    def __init__(self): 
 
         with open("client/config.yaml", "r") as file:
             self.config = load(file, Loader=Loader)

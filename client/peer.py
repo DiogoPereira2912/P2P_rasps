@@ -18,6 +18,7 @@ class Peer:
         self.prefix = f"br_{self.broker_id.split('_')[-1]}/"
         self.node_id = self.config["node_id"]
         self.known_peers = []
+        self.device_id = self.config["device_id"]
         # --- inicialização de cliente MQTT e socket --- #
         self._setup_mqtt_client()
         self._setup_socket()
@@ -68,13 +69,14 @@ class Peer:
         listener.start()
 
     def _notify_peers(self):
-        """
-        Troca de informçoes entre peers, envia a porta do broker
-        """
-        self.sock_broadcast.sendto(
-            f"hello {self.mosquitto_port} {self.node_id}".encode(),
-            (self.broadcast_mask, self.broadcast_port),
-        )
+            """
+            Troca de informçoes entre peers, envia a porta, node_id E O DEVICE_ID
+            """
+            msg = f"hello {self.mosquitto_port} {self.node_id} {self.device_id}"
+            self.sock_broadcast.sendto(
+                msg.encode(),
+                (self.broadcast_mask, self.broadcast_port),
+            )
 
     def add_mosquitto_bridge(self, remote_peer_ip, remote_peer_port):
         """
@@ -100,11 +102,11 @@ class Peer:
             pass
         else:
             bridge_config = f"""
-    connection bridge_to_peer__{remote_peer_id}
-    address {remote_peer_ip}:{remote_peer_port}
-    topic {self.broker_id}/# out 1 {self.prefix}
-    topic {remote_peer_id}/# in 1
-    topic {remote_peer_id}/# out 1
+            connection bridge_to_peer__{remote_peer_id}
+            address {remote_peer_ip}:{remote_peer_port}
+            topic {self.broker_id}/# out 1 
+            topic {remote_peer_id}/# in 1
+            topic {remote_peer_id}/# out 1
                 """
 
             with open("./mosquitto/conf.d/bridges.conf", "a") as f:
@@ -126,10 +128,10 @@ class Peer:
                 continue
 
             if msg.startswith("hello") or msg.startswith("hi"):
-                _, peer_mqtt_port, peer_id = msg.split()
+                _, peer_mqtt_port, peer_network_id, peer_device_id = msg.split()
                 peer_mqtt_port = int(peer_mqtt_port)
-                peer_id = int(peer_id)
-                peer = (addr[0], peer_mqtt_port, peer_id)
+                peer_id = int(peer_network_id)
+                peer = (addr[0], peer_mqtt_port, peer_id, peer_device_id)
 
                 if peer not in self.known_peers:
                     self.known_peers.append(peer)
@@ -137,19 +139,19 @@ class Peer:
                     for p in self.known_peers:
                         self.add_mosquitto_bridge(p[0], p[1])
                         if p != peer:
-                            self.sock_broadcast.sendto(f"hi {p[1]} {p[2]}".encode(), (p[0], p[1]))
+                            self.sock_broadcast.sendto(f"hi {p[1]} {p[2]} {p[3]}".encode(), (p[0], p[1]))
                     self._broadcast_known_peers_internally()
 
                 if msg.startswith("hello"):
                     self.sock_broadcast.sendto(
-                        f"hi {self.mosquitto_port} {self.node_id}".encode(), addr
+                        f"hi {self.mosquitto_port} {self.node_id} {self.device_id}".encode(), addr
                     )
 
     def _broadcast_known_peers_internally(self): 
-        """
+        """ 
         Envia a lista de IPs para os outros módulos (Pipeline/Agg) usarem.
         """
-        ip_list = sorted([(p[0], p[2]) for p in self.known_peers])
+        ip_list = sorted([(p[0], p[2], p[3]) for p in self.known_peers])
         known_peers_payload = json.dumps(ip_list)
         self.mqtt_com.client.publish(payload = known_peers_payload, topic = "system/peers", retain=True)
 

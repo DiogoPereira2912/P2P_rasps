@@ -11,7 +11,10 @@ services:
     volumes:
       - ./mosquitto:/mosquitto/config
       - ./mosquitto/conf.d:/mosquitto/conf.d
-
+    depends_on:
+      rpi-video-server: 
+        condition: service_healthy
+        
   peer:
     build: ./client
     container_name: client
@@ -25,41 +28,78 @@ services:
       - ./client:/app
       - ./mosquitto:/app/mosquitto
       - /var/run/docker.sock:/var/run/docker.sock
-
     tty: true
 
-# Implementado novo
+  # pipeline:
+  #   build: ./pipeline_layer
+  #   container_name: pipeline
+  #   network_mode: "host"
+  #   depends_on:
+  #     peer:
+  #       condition: service_started
+  #   volumes:
+  #     - ./client:/app/client
+  #     - ./pipeline_layer:/app
+  #     - ./mosquitto:/app/mosquitto
+  #     - ./aggregation_layer:/app/aggregation_layer
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #     - ../models:/models
+  #   environment:
+  #     - PYTHONUNBUFFERED=1
 
-  pipeline:
-    build: ./pipeline_layer
-    container_name: pipeline
-    network_mode: "host"
-    depends_on:
-      broker:
-        condition: service_started
-      peer:
-        condition: service_started
-    volumes:
-      - ./client:/app/client
-      - ./pipeline_layer:/app
-      - ./mosquitto:/app/mosquitto
-      - /var/run/docker.sock:/var/run/docker.sock
-    environment:
-      - PYTHONUNBUFFERED=1
+  # aggregation:
+  #   build: ./aggregation_layer
+  #   container_name: aggregation
+  #   network_mode: "host"
+  #   depends_on:
+  #     peer:
+  #       condition: service_started
+  #   volumes:
+  #     - ./client:/app/client
+  #     - ./aggregation_layer:/app
+  #     - ./mosquitto:/app/mosquitto
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #     - ../models:/models
+  #   environment:
+  #     - PYTHONUNBUFFERED=1
 
-  aggregation:
-    build: ./aggregation_layer
-    container_name: aggregation
-    network_mode: "host"
-    depends_on:
-      broker:
-        condition: service_started
-      peer:
-        condition: service_started
-    volumes:
-      - ./client:/app/client
-      - ./aggregation_layer:/app
-      - ./mosquitto:/app/mosquitto
-      - /var/run/docker.sock:/var/run/docker.sock
+  rpi-video-server:
+    container_name: rpi-video-server_v${VERSION}
+    image: rpi-video-server:v${VERSION}
+    build: ./video_server
+    ports:
+      - ${WEBPAGE_PORT}:8000 # local : dentro do container
+    devices:
+      - /dev/video0:/dev/video0
+      #- /dev/video2:/dev/video2
     environment:
-      - PYTHONUNBUFFERED=1
+      CAM0: ${CAM0}
+      CAM1: ${CAM1}
+    volumes:
+    - /home/aidi/P2P/video_server:/usr/src/app/
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"] # porta dentro do conatiner
+      start_period: 1m
+      start_interval: 10s
+
+  detector:
+    build: code_detector
+    container_name: detector_container
+    devices:
+      - /dev/video0:/dev/video0
+      # - /dev/video2:/dev/video2
+      - /dev/hailo0:/dev/hailo0     
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - /lib/firmware:/lib/firmware
+      - /run/udev:/run/udev:ro
+      - /run/user:/run/user
+      - ./labeling:/app/labeling
+      - ./client:/app/client
+      - ./video_server:/app/video_server
+      - ./data_exports:/app/data_exports
+    privileged: true
+    ipc: host
+    depends_on:
+      rpi-video-server: 
+        condition: service_healthy
