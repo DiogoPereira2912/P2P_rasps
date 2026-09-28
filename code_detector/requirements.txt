@@ -1,0 +1,9 @@
+notebook
+ipykernel
+degirum
+degirum_tools
+degirum_cli
+numpy
+opencv-python
+pyyaml
+paho-mqtt

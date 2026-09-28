@@ -1,5 +1,9 @@
-scikit-learn
 PyYAML
 pandas
 numpy
 paho-mqtt
+torch
+ultralytics
+scikit-learn
+deltalake
+pyarrow

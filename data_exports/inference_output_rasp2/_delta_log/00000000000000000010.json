@@ -1,0 +1,1 @@
+{"commitInfo":{"timestamp":1772462477824,"operation":"WRITE","operationParameters":{"mode":"Append"},"engineInfo":"delta-rs:py-1.4.2","operationMetrics":{"execution_time_ms":1,"num_added_files":0,"num_added_rows":0,"num_partitions":0,"num_removed_files":0},"clientVersion":"delta-rs.py-1.4.2"}}

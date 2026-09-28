@@ -43,7 +43,7 @@ class Communication_Layer:
         self.client = self._connect_mqtt(broker, port, user, pwd)
         self.client.loop_start()
         self.client.on_message = self.on_message
-
+ 
     def _connect_mqtt(self, broker, port, user, pwd):
         def on_connect(client, userdata, flags, rc):
             if rc == 0:
@@ -87,10 +87,9 @@ class Communication_Layer:
         Callback para processar mensagens recebidas.
         Acrescenta mensagens à fila interna, ignorando mensagens do próprio client_id.
         '''
-        if msg.topic.startswith(f"{self.topic_broker_id}/"): # impede que ouça as suas
-            return
+        # if msg.topic.startswith(f"{self.topic_broker_id}/"): # impede que ouça as suas
+        #     return
         data = json.loads(msg.payload.decode())
-        # print(f"[{self.topic_broker_id}] RECEIVED on {msg.topic}: {data}")
         self.msg_queue.put((msg.topic, data)) 
 
     def subscribe(self, topic):

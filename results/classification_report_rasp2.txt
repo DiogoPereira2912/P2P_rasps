@@ -1,0 +1,27 @@
+--- RELATÓRIO DO DISPOSITIVO: rasp2 ---
+
+=== PERFORMANCE DO MODELO LOCAL ===
+                     precision    recall  f1-score   support
+
+           INTRUSAO       0.00      0.00      0.00         0
+PROXIMIDADE_MAQUINA       0.32      1.00      0.48         8
+               SAFE       0.14      0.50      0.22         2
+          SINAL_SOS       0.00      0.00      0.00        23
+
+           accuracy                           0.27        33
+          macro avg       0.12      0.38      0.18        33
+       weighted avg       0.09      0.27      0.13        33
+
+
+=== PERFORMANCE APÓS CONSENSO GLOBAL ===
+                     precision    recall  f1-score   support
+
+        PERIGO_GRUA       0.00      0.00      0.00         0
+PROXIMIDADE_MAQUINA       0.00      0.00      0.00         8
+     QUEDA_DETETADA       0.00      0.00      0.00         0
+               SAFE       0.11      0.50      0.18         2
+          SINAL_SOS       0.00      0.00      0.00        23
+
+           accuracy                           0.03        33
+          macro avg       0.02      0.10      0.04        33
+       weighted avg       0.01      0.03      0.01        33

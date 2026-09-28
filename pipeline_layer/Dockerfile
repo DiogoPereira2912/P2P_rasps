@@ -1,12 +1,9 @@
-FROM python:3.11-slim
+FROM p2p-rpi
 
 WORKDIR /app
-COPY requirements.txt ./
 
-RUN apt-get update && apt-get install -y docker-cli
-
-RUN pip install --no-cache-dir -r requirements.txt
+ENV PYTHONUNBUFFERED=1
 
 COPY . .
 
-CMD ["python", "pipeline.py"]
+CMD ["python3", "pipeline_probs.py"]

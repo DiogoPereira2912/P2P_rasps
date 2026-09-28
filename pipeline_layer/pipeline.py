@@ -11,10 +11,10 @@ warnings.filterwarnings("ignore")
 
 from client.mqtt_layer import Communication_Layer
 
-
+ 
 class Model_Manager:
 
-    def __init__(self):
+    def __init__(self): 
 
         with open("client/config.yaml", "r") as file:
             self.config = load(file, Loader=Loader)
@@ -24,7 +24,7 @@ class Model_Manager:
         self.broadcast_mask = self.config["broadcast_mask"]
         self.peer_ip = self.config["peer_ip"]
         self.broker_id = self.peer_ip.replace(".", "_")
-
+ 
         self.node_id = self.config["node_id"]
         self.mode = self.config["mode"]
         self.central_id = self.config["central_id"]

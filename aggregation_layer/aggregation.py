@@ -37,7 +37,7 @@ class Aggregator:
         self.last_ts = None
         self.last_round_start = 0
         self.started_training_time = None
-        self.remote_params = {}
+        self.remote_params = {} 
 
         if self.mode == "federated":
             if self.node_id == self.central_id:
@@ -128,7 +128,7 @@ class Aggregator:
                 self.mqtt_com.msg_queue.task_done()
                 continue
 
-            if len(self.current_peer_list) < self.min_peers:
+            if len(self.current_peer_list) < self.min_peers: 
                 self.mqtt_com.msg_queue.task_done()
                 continue
 

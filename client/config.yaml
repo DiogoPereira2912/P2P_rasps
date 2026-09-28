@@ -1,13 +1,34 @@
+# node configs
 mosquitto_port: 1884
 broadcast_port: 50001
 broadcast_mask: "255.255.255.255"
-peer_ip: "172.31.1.143"
+peer_ip: "172.31.1.117"
 
-node_id: 0
+node_id: 1
 mode: "gossip" #"federated" #"gossip" 
 central_id: 0
-min_peers: 1
+min_peers: 2
 
+# network topology -> verify peer id
 routing_topology:
-  aggregation_topology: [1, 2]
-  pipeline_topology: [1, 2]
+  aggregation_topology: [0, 2]
+  pipeline_topology: [0, 2]
+
+# camera config
+video_path: 
+          - /dev/video0
+resolution:
+  height: 1920
+  width: 1080 
+anonymous: true
+
+# thingsboard config
+tb_ip: "172.31.1.104"
+tb_token: "nA4R97GxV2WHx3ScNxHT" # criar device para cada rasp na dashboard dps e alterar token
+test_ip: "demo.thingsboard.io"
+test_token: "x3idotgrwwr9kc32mfxr"
+
+# labelling config
+labeling_rules: ../labeling/labeling_rules.yaml
+global_rules: ../labeling/global_rules.yaml
+device_id: "rasp2" 

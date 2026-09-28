@@ -1,0 +1,69 @@
+regras:
+
+  - nome: "Operacao Grua"
+    label: "PERIGO_GRUA"
+    prioridade: 1
+    condicoes:
+      label_type: "person"
+      confidence_min: 0.5
+      pose_rule:
+        ponto_a: 9   # Pulso Esq
+        ponto_b: 10  # Pulso Dir
+        max_dist: 50 # A distância em pixeis
+
+  - nome: "Possível Queda"
+    label: "QUEDA_DETETADA"
+    prioridade: 2
+    condicoes:
+      label_type: "person"
+      confidence_min: 0.6
+      pose_rule:
+        # Verifica se a cabeça (0) está abaixo ou ao nível da cintura (11/12)
+        ponto_a: 0    # Nariz/Cabeça
+        ponto_b: 11   # Anca Esq
+        max_dist: 30  # Se a dist vertical for pequena, a pessoa está horizontal ou caída
+
+  - nome: "Pedido de Auxílio"
+    label: "SINAL_SOS"
+    prioridade: 3
+    condicoes:
+      label_type: "person"
+      confidence_min: 0.5
+      pose_rule:
+        # Mãos acima da cabeça (comparando Y do pulso com Y do nariz)
+        ponto_a: 10   # Pulso Dir
+        ponto_b: 0    # Nariz
+        max_dist: 100 # Ajustar conforme a escala da câmera
+
+  - nome: "Acesso a Corredor Logístico"
+    label: "ZONA_FORKLIFT"
+    prioridade: 4
+    condicoes:
+      label_type: "person"
+      ROI_rule:
+        # Exemplo de uma faixa lateral no armazém
+        x1: 1500
+        x2: 1920
+        y1: 100
+        y2: 1080
+
+  - nome: "Interação Proibida"
+    label: "PROXIMIDADE_MAQUINA"
+    prioridade: 5
+    condicoes:
+      label_type: "person"
+      pose_rule:
+        ponto_a: 10   # Pulso Dir
+        ponto_b: 6    # Ombro Dir
+        max_dist: 150 # Se a distância for grande, o braço está esticado (possível toque)
+
+  - nome: "Zona de Perigo"
+    label: "INTRUSAO"
+    prioridade: 6
+    condicoes:
+      label_type: "person"
+      ROI_rule:
+        x1: 10  # coords da ROI
+        x2: 1900
+        y1: 10
+        y2: 1000

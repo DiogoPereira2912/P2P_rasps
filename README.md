@@ -1,15 +1,9 @@
-## THINGS
-
--> Testei o envio de parametros e tava a funcionar entre modulos e com 3 rasps
--> Topologia de rede implementada
--> Agr cada nó envia um id, para não trocar de server caso entrem outros na rede
--> Remoção de duplicados na camada de pipeline e aggregation testada 
-
-
-## TODO
--> Integrar com NNs, e tentar integrar com o projeto da segurança (YOLO)
-
 ## CHECKPOINT
 
--> Infraestrutura testada
--> Alterar camada para integração com DL models
+-> Infraestrutura testada com nova imagem base
+
+## TODO
+-> Testar o deploy offline
+-> Testar integração com o prometheus e grafana
+-> Tentar tornar isto o mais profissional e organizado possivel
+-> Alterar camada para integração com DL models e aprendizagem automatica com troca de pesos e model pruning

@@ -1,0 +1,9 @@
+pandas
+numpy
+deltalake
+paho-mqtt
+pyyaml
+scikit-learn
+pyarrow
+matplotlib
+seaborn
