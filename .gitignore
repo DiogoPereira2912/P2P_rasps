@@ -1,0 +1,4 @@
+client/config.yaml
+data_exports/
+results/
+__pycache__/

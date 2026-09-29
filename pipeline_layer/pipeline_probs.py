@@ -7,6 +7,7 @@ from yaml import Loader, load
 import json, threading, time, uuid, pickle, os
 from client.mqtt_layer import Communication_Layer
 import pandas as pd
+from prometheus_client import start_http_server, Counter
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -42,11 +43,30 @@ class Model_Manager:
         self.loaded_model = None
         self.phase = None
 
+        # Prometheus metrics
+        self.frames_counter = Counter(
+            'aidi_frames_processed_total', 
+            'Total de frames inferidos no nó', 
+            ['node_id', 'algo_mode']
+        )
+
         self._setup_mqtt_client()
+        self._setup_prometheus_exporter()
         self._start_pipe_worker()
 
         self.best_model = None
         self.best_params = None
+
+    def _setup_prometheus_exporter(self):
+        """
+        Configura o Prometheus exporter para monitoramento.
+        Inicia o servidor HTTP na porta 8000 para expor métricas.
+        """
+        try:
+            start_http_server(8000)
+            print("📡 Prometheus exporter a correr na porta 8000")
+        except Exception as e:
+            print(f"Aviso: Não foi possível iniciar o Prometheus exporter: {e}")
 
     def _setup_mqtt_client(self):
         """
@@ -222,6 +242,9 @@ class Model_Manager:
             "preds": preds.tolist()
         }
         print(f"📊 Publicando Predições: {pred_probs}")
+
+        self.frames_counter.labels(node_id=self.node_id, algo_mode=self.mode).inc()
+
         if self.mode == "federated":
             self.mqtt_com.publish(model_preds_payload, topic=f"{self.broker_id}/agg")
         else:

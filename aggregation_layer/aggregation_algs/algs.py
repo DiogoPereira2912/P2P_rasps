@@ -112,7 +112,7 @@ def aggregate_avg(probs_dict):
         
         for p in preds_list:
             if len(p) > max_num_classes:
-                max_num_classes = len(p)
+                max_num_classes = len(p) 
                 
     if max_num_classes == 0:
         return None

@@ -2,9 +2,9 @@
 mosquitto_port: 1884
 broadcast_port: 50001
 broadcast_mask: "255.255.255.255"
-peer_ip: "172.31.1.117"
+peer_ip: # update with the ip of the raspberry
 
-node_id: 1
+node_id: # update with the id of the raspberry
 mode: "gossip" #"federated" #"gossip" 
 central_id: 0
 min_peers: 2

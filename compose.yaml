@@ -118,3 +118,15 @@ services:
       - ./results:/app/results
     environment:
       - PYTHONUNBUFFERED=1
+
+  cadvisor:
+      image: gcr.io/cadvisor/cadvisor:v0.47.0 # Versão ARM para Raspberry Pi
+      container_name: cadvisor
+      ports:
+        - "8080:8080"
+      volumes:
+        - /:/rootfs:ro
+        - /var/run:/var/run:rw
+        - /sys:/sys:ro
+        - /var/lib/docker/:/var/lib/docker:ro
+      restart: always

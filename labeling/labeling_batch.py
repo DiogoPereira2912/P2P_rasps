@@ -35,9 +35,9 @@ class Labeller:
 
         # --- Caminhos ---
         self.parquet_raw_path = f"data_exports/raw_{self.config['device_id']}"
-        self.parquet_labelled_path = f"data_exports/labelled_{self.config['device_id']}"
+        # self.parquet_labelled_path = f"data_exports/labelled_{self.config['device_id']}"
         self.output_folder = f"data_exports/global_output_{self.config['device_id']}"
-        self.output_folder_local = f"data_exports/local_output_{self.config['device_id']}"
+        # self.output_folder_local = f"data_exports/local_output_{self.config['device_id']}"
         self.inf_output_folder = f"data_exports/inference_output_{self.config['device_id']}"
         self.inf_local_data_path = f"data_exports/local_inf_data_{self.config['device_id']}"
         self.results_path = f"results/"
@@ -202,12 +202,12 @@ class Labeller:
             df_labelled = pd.concat([df_working[['ts']], binary_df], axis=1)
 
             # 3. Gravar Labelled locais
-            try:
-                if not os.path.exists(self.parquet_labelled_path):
-                    os.makedirs(self.parquet_labelled_path)
-                write_deltalake(self.parquet_labelled_path, df_labelled, mode="append")
-            except Exception as e:
-                print(f"Erro ao gravar Labelled local: {e}")
+            # try:
+            #     if not os.path.exists(self.parquet_labelled_path):
+            #         os.makedirs(self.parquet_labelled_path)
+            #     write_deltalake(self.parquet_labelled_path, df_labelled, mode="append")
+            # except Exception as e:
+            #     print(f"Erro ao gravar Labelled local: {e}")
 
             df_export = df_labelled.copy()
             df_export['ts'] = df_export['ts'].astype(str)
@@ -235,9 +235,9 @@ class Labeller:
                     lambda row: self.get_global_status(row, self.global_rules, search_ids), axis=1
                 )
 
-                if not os.path.exists(self.output_folder_local):
-                    os.makedirs(self.output_folder_local)
-                write_deltalake(self.output_folder_local, df_final_local, mode="append")
+                # if not os.path.exists(self.output_folder_local):
+                #     os.makedirs(self.output_folder_local)
+                # write_deltalake(self.output_folder_local, df_final_local, mode="append")
 
         elif self.phase == "INFERENCE":
 
