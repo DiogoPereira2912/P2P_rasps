@@ -29,8 +29,11 @@ class Aggregator:
 
         self.mode = self.config["mode"]
         self.central_id = self.config["central_id"]
-        self.server_ip = None # ip descoberto com o node_id = 0
-        self.server_id = None # replace de . por _ para estar de acordo com a bridge
+        
+        self.server_ip = None 
+        self.server_id = None 
+        
+        self.is_dynamic_server = False
 
         self.current_peer_list = []
         self.min_peers = self.config["min_peers"]
@@ -47,18 +50,22 @@ class Aggregator:
 
         self.test_data_path = f"data_exports/local_inf_data_{self.config['device_id']}"
 
-        if self.mode == "federated":
-            if self.node_id == self.central_id:
-                print("[AGGREGATOR] Eu sou o SERVIDOR CENTRAL (Main).")
-                self._setup_mqtt_client(subscribe_topic="+/agg")
-                self._start_agg_worker()
-            else:
-                print("[AGGREGATOR] Modo Federated: Sou um Worker.")
-                pass 
-        else: 
-            self._setup_mqtt_client(subscribe_topic="+/agg")
-            self._start_agg_worker()
+        # if self.mode == "federated":
+        #     if self.node_id == self.central_id:
+        #         print("[AGGREGATOR] Eu sou o SERVIDOR CENTRAL (Main).")
+        #         self._setup_mqtt_client(subscribe_topic="+/agg")
+        #         self._start_agg_worker()
+        #     else:
+        #         print("[AGGREGATOR] Modo Federated: Sou um Worker.")
+        #         pass 
+        # else: 
+        #     self._setup_mqtt_client(subscribe_topic="+/agg")
+        #     self._start_agg_worker()
  
+        # Todos os nós iniciam a escuta MQTT e o Worker para poderem receber ordens dinâmicas
+        self._setup_mqtt_client(subscribe_topic="+/agg")
+        self._start_agg_worker()
+
     def _setup_mqtt_client(self, subscribe_topic):
         """
         Cria o cliente MQTT e faz o subscribe ao tópico
@@ -83,10 +90,45 @@ class Aggregator:
             payload = json.loads(msg.payload.decode())
             cmd = payload.get("command")
             
+            config_recebida = payload.get("config", {})
+            
+            if "mode" in config_recebida:
+                self.mode = "federated" if config_recebida["mode"] == "FL" else "gossip"
+                print(f"⚙️ MODO AGGREGATOR FORÇADO: {self.mode.upper()}")
+                
+            if "central_ip" in config_recebida:
+                self.server_ip = config_recebida["central_ip"]
+                self.server_id = self.server_ip.replace(".", "_")
+                self.is_dynamic_server = True 
+                
+                if self.peer_ip == self.server_ip:
+                    print("👑 Fui promovido a MAIN SERVER (Agregador)!")
+                else:
+                    print(f"👷 Sou WORKER (Agregador). O orquestrador é o {self.server_ip}")
+
             self.phase = cmd
 
         except Exception as e:
             print(f"Erro no controlo Aggregator: {e}")
+
+    def _verify_central_server(self, peers_list):
+        """
+        Descobre quem é o servidor central na lista de peers.
+        Se a UI já o definiu dinamicamente, ignora a leitura do YAML.
+        """
+        if self.is_dynamic_server:
+            return
+            
+        if self.node_id == self.central_id:
+            self.server_ip = self.peer_ip
+            self.server_id = self.server_ip.replace(".", "_")
+            print("[AGGREGATOR] MAIN SERVER")
+        else:
+            print("[AGGREGATOR] WORKER")
+            for p in peers_list:
+                if p[1] == self.central_id:
+                    self.server_ip = p[0]
+                    self.server_id = self.server_ip.replace(".", "_")
 
     def _start_agg_worker(self):
         '''
@@ -185,6 +227,8 @@ class Aggregator:
                     topic, data = self.mqtt_com.msg_queue.get(timeout=0.5)
                     if topic == "system/peers":
                         self.current_peer_list = data
+                        if self.mode == "federated":
+                            self._verify_central_server(self.current_peer_list)
                     else:
                         self._process_msg_into_buffer(data, current_round_buffer)
                     self.mqtt_com.msg_queue.task_done()
@@ -202,7 +246,7 @@ class Aggregator:
                 final_prob_idx = np.argmax(final_probs[0]) if final_probs else None
                 final_label = self.reverse_label_map.get(final_prob_idx, "UNKNOWN")
 
-                if self.phase in ["TEST", "INFERENCE"]:
+                if self.phase in ["INFERENCE", "METRICS"]:
                     print(f"💾 [IO] A tentar gravar. Procuro pelo ID: {self.node_id}")
                     if self.node_id in current_round_buffer:
 
@@ -223,6 +267,12 @@ class Aggregator:
                             
                         write_deltalake(self.test_data_path, full_test_df, mode="append")
                         print(f"✅ [SUCESSO] Dados gravados em {self.test_data_path}")
+
+                # only central server publishes the aggregated prediction to the workers in federated mode
+                if self.mode == "federated" and self.peer_ip != self.server_ip:
+                    self.remote_preds = {}
+                    self.pred_probs_dict = {}
+                    continue 
 
                 payload = {
                     "id": self.broker_id,

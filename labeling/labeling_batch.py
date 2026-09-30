@@ -106,9 +106,9 @@ class Labeller:
                 cfg = payload.get("config", {})
                 self.inf_TARGET_BATCHES = cfg.get("max_saves", 10)
             
-            elif self.phase == "TEST":
-                print("📊 FASE ALTERADA PARA: TEST no Labeler!")
-                self.mqtt_com.msg_queue.put(("trigger_test", {}))
+            elif self.phase == "METRICS":
+                print("📊 FASE ALTERADA PARA: METRICS no Labeler!")
+                self.mqtt_com.msg_queue.put(("generate_metrics", {}))
 
         except Exception as e:
             print(f"Erro no controlo Labeler: {e}")
@@ -287,7 +287,7 @@ class Labeller:
                 self.mqtt_com.msg_queue.task_done()
                 continue
 
-            if topic == "trigger_test" and self.phase == "TEST":
+            if topic == "generate_metrics" and self.phase == "METRICS":
                 time.sleep(0.5)
                 print("🔍 TESTE DE MÉTRICAS COM DADOS DE INFERÊNCIA E GROUND TRUTH")
                 try:

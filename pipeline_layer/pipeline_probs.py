@@ -30,8 +30,10 @@ class Model_Manager:
         self.node_id = self.config["node_id"]
         self.mode = self.config["mode"]
         self.central_id = self.config["central_id"]
-        self.server_ip = None # ip descoberto com o node_id = 0
-        self.server_id = None # replace de . por _ para estar de acordo com a bridge
+        self.server_ip = None 
+        self.server_id = None 
+        
+        self.is_dynamic_server = False 
 
         self.is_training = False
         self.current_peer_list = []
@@ -66,7 +68,7 @@ class Model_Manager:
             start_http_server(8000)
             print("📡 Prometheus exporter a correr na porta 8000")
         except Exception as e:
-            print(f"Aviso: Não foi possível iniciar o Prometheus exporter: {e}")
+            print(f"⚠️️ Aviso: Não foi possível iniciar o Prometheus exporter: {e}")
 
     def _setup_mqtt_client(self):
         """
@@ -86,19 +88,29 @@ class Model_Manager:
         self.mqtt_com.subscribe("system/control/#")
         self.mqtt_com.client.message_callback_add("system/control/#", self.on_control_phase_message)
 
-    def on_control_phase_message(self, topic, userdata, msg):
-        try:
-            print(f"📩 MENSAGEM RECEBIDA: {msg.payload}")
-            payload = json.loads(msg.payload.decode())
-            cmd = payload.get("command")
+            config_recebida = payload.get("config", {})
             
+            if "mode" in config_recebida:
+                self.mode = "federated" if config_recebida["mode"] == "federated" else "gossip"
+                print(f"⚙️️ Chosen mode: {self.mode.upper()}")
+                
+            if "central_ip" in config_recebida:
+                self.server_ip = config_recebida["central_ip"]
+                self.server_id = self.server_ip.replace(".", "_")
+                self.is_dynamic_server = True
+                
+                if self.peer_ip == self.server_ip:
+                    print("👑 Fui promovido a MAIN SERVER (Pipeline) pela Control Tower!")
+                else:
+                    print(f"👷 Sou WORKER (Pipeline). Orquestrador atual: {self.server_ip}")
+
             self.phase = cmd
             print(f"🔄 FASE ALTERADA PARA: {self.phase}")
 
             if cmd == "TRAIN":
                 threading.Thread(target=self.run_model_training).start()
             
-            elif cmd == "INFERENCE":
+            elif cmd in ["INFERENCE", "METRICS"]:
                 if not self.loaded_model:
                     self._try_load_existing_model()
                     if not self.loaded_model:
@@ -127,11 +139,11 @@ class Model_Manager:
             return None
         
     def _verify_central_server(self, peers_list):
-        """
-        Verifica se sou o central
-        Verifica se o servidor central está na lista de peers conhecidos.
-        Se não estiver, adiciona uma bridge para ele.
-        """
+
+        if self.is_dynamic_server:
+            self.mqtt_com.subscribe(topic="+/train")
+            return
+            
         if self.node_id == self.central_id:
             self.server_ip = self.peer_ip
             self.server_id = self.server_ip.replace(".", "_")
@@ -176,7 +188,7 @@ class Model_Manager:
                 'classifier__max_depth' : [4,5,6,7,8],
                 'classifier__criterion' :['gini', 'entropy']
             },
-            cv=5,  # 5-fold cross-validation
+            cv=5, 
             scoring="accuracy",
             n_jobs=-1,
             verbose=1,
@@ -232,8 +244,9 @@ class Model_Manager:
         '''
         df = pd.DataFrame(data)
         df = df.drop(columns=['ts'])
-        pred_probs = self.loaded_model.predict_proba(df) # forçar cálculo de probabilidades
-        preds = self.loaded_model.predict(df) # forçar cálculo de predições
+        pred_probs = self.loaded_model.predict_proba(df) 
+        preds = self.loaded_model.predict(df) 
+        
         model_preds_payload = {
             "id": self.node_id,
             "ts": time.time(),
@@ -243,6 +256,7 @@ class Model_Manager:
         }
         print(f"📊 Publicando Predições: {pred_probs}")
 
+        # Atualiza métrica no Prometheus
         self.frames_counter.labels(node_id=self.node_id, algo_mode=self.mode).inc()
 
         if self.mode == "federated":
@@ -280,7 +294,7 @@ class Model_Manager:
                 continue
 
             elif topic == "system/inference":
-                if self.phase == "INFERENCE":
+                if self.phase in ["INFERENCE", "METRICS"]:
                     if len(self.current_peer_list) >= self.min_peers:
 
                         node_id = data["id"]
