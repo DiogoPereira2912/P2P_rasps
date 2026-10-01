@@ -4,34 +4,34 @@ regras:
     label: "PERIGO_GRUA"
     prioridade: 1
     condicoes:
-      rasp2: 1
+      rasp1: 1 # ALTERAR o rasp id para o atual
 
   - nome: "Possível Queda"
     label: "QUEDA_DETETADA"
     prioridade: 2
     condicoes:
-      rasp2: 1
+      rasp1: 1
 
   - nome: "Pedido de Auxílio"
     label: "SINAL_SOS"
     prioridade: 3
     condicoes:
-      rasp2: 1
+      rasp1: 1
 
   - nome: "Acesso a Corredor Logístico"
     label: "ZONA_FORKLIFT"
     prioridade: 4
     condicoes:
-      rasp2: 1
+      rasp1: 1
 
   - nome: "Interação Proibida"
     label: "PROXIMIDADE_MAQUINA"
     prioridade: 5
     condicoes:
-      rasp2: 1
+      rasp1: 1
 
   - nome: "Zona de Perigo"
     label: "INTRUSAO"
     prioridade: 6
     condicoes:
-      rasp2: 1
+      rasp1: 1

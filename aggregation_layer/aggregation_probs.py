@@ -46,7 +46,19 @@ class Aggregator:
         self.pred_probs_dict = {}
         self.test_data = None
         self.phase = "IDLE"
-        _, self.reverse_label_map, self.class_list = load_class_mappings("labeling/global_rules.yaml")
+        self.label_map, self.reverse_label_map, self.class_list = load_class_mappings("labeling/global_rules.yaml")
+        
+        with open("labeling/global_rules.yaml", "r") as file:
+            self.global_rules = load(file, Loader=Loader)
+
+        # --- MAPA DINÂMICO DE PRIORIDADES ---
+        self.priority_map = {}
+        for rule in self.global_rules.get('regras', []):
+            label = rule['label']       
+            prio = rule['prioridade']   
+            idx = self.label_map.get(label)
+            if idx is not None:
+                self.priority_map[idx] = prio
 
         self.test_data_path = f"data_exports/local_inf_data_{self.config['device_id']}"
 
@@ -137,7 +149,7 @@ class Aggregator:
         agg_thread = threading.Thread(target=self.agg_worker, daemon=True)
         agg_thread.start()
 
-    def aggregate(self, params_dict, method):
+    def aggregate(self, params_dict, method, **kwargs):
         '''
         Agrega os parâmetros recebidos usando o método especificado.
         Args:
@@ -148,7 +160,7 @@ class Aggregator:
         '''
         if method not in ALGS_DICT:
             raise ValueError(f"Método de agregação '{method}' não suportado.")
-        return ALGS_DICT[method](params_dict)
+        return ALGS_DICT[method](params_dict, **kwargs)
 
     def _process_msg_into_buffer(self, data, buffer):
         '''
@@ -240,7 +252,14 @@ class Aggregator:
 
                 self.remote_preds = {k: v['preds'] for k, v in current_round_buffer.items()}
                 self.pred_probs_dict = {k: v['pred_probs'] for k, v in current_round_buffer.items()}
-                final_probs = self.aggregate(self.pred_probs_dict, method="avg")
+                #final_probs = self.aggregate(self.pred_probs_dict, method="avg")
+                final_probs = self.aggregate(
+                    self.pred_probs_dict, 
+                    method="fallback",
+                    threshold=0.3,              
+                    fallback_mode="priority", 
+                    priority_map=self.priority_map
+                )
 
                 # sacar idx e label correspondente para a classe mais provável
                 final_prob_idx = np.argmax(final_probs[0]) if final_probs else None

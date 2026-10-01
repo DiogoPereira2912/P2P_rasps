@@ -141,6 +141,49 @@ def aggregate_avg(probs_dict):
         
     return final_probs
 
+def confidence_fallback_aggregation(params_dict, threshold=0.3, fallback_mode="priority", local_id=None, priority_map=None):
+    """
+    Agrega probabilidades e aplica fallback se a margem de confiança for baixa.
+    No modo 'priority', escolhe a opção com MAIOR prioridade (número mais baixo) entre as duas mais votadas.
+    """
+    probs_list = list(params_dict.values())
+    
+    avg_probs = np.mean(probs_list, axis=0)
+    flat_probs = avg_probs[0] 
+    
+    sorted_indices = np.argsort(flat_probs)[::-1]
+    top1_idx = sorted_indices[0]
+    top2_idx = sorted_indices[1]
+    
+    margin = flat_probs[top1_idx] - flat_probs[top2_idx]
+    
+    if margin >= threshold:
+        print(f"✅ Confiança Alta (Margem: {margin:.2f}). Decisão Global mantida.")
+        return avg_probs
+    else:
+        print(f"⚠️ Confiança Baixa (Margem: {margin:.2f} < {threshold}). A aplicar Fallback...")
+        
+        if fallback_mode == "priority" and priority_map is not None:
+            # Consulta a prioridade (se não existir, assume 999 = muito baixa prioridade / SAFE)
+            prio_1 = priority_map.get(top1_idx, 999)
+            prio_2 = priority_map.get(top2_idx, 999)
+            
+            # Escolhe o índice com MENOR número (MAIOR prioridade)
+            preventive_idx = top1_idx if prio_1 <= prio_2 else top2_idx
+            
+            print(f"🛡️ Conflito: idx {top1_idx} (prio {prio_1}) vs idx {top2_idx} (prio {prio_2}). Venceu o idx {preventive_idx}.")
+            
+            # Devolve a predição com 100% de probabilidade na classe vencedora
+            fallback_probs = np.zeros_like(avg_probs)
+            fallback_probs[0, preventive_idx] = 1.0
+            return fallback_probs
+            
+        elif fallback_mode == "local" and local_id in params_dict:
+            return params_dict[local_id]
+        
+        return avg_probs
+
 ALGS_DICT = {
     "avg": aggregate_avg,
+    "fallback": confidence_fallback_aggregation,
 }
