@@ -261,7 +261,6 @@ class Aggregator:
                     priority_map=self.priority_map
                 )
 
-                # sacar idx e label correspondente para a classe mais provável
                 final_prob_idx = np.argmax(final_probs[0]) if final_probs else None
                 final_label = self.reverse_label_map.get(final_prob_idx, "UNKNOWN")
 

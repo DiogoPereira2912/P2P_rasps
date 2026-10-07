@@ -88,6 +88,16 @@ class Model_Manager:
         self.mqtt_com.subscribe("system/control/#")
         self.mqtt_com.client.message_callback_add("system/control/#", self.on_control_phase_message)
 
+    def on_control_phase_message(self, client, userdata, msg):
+        """
+        Processa mensagens de controlo recebidas via MQTT.
+        1. Atualiza a fase de operação (TRAIN, INFERENCE, METRICS ou STOP).
+        2. Se a fase for TRAIN, inicia o treino do modelo.
+        3. Se a fase for INFERENCE ou METRICS, tenta carregar um modelo existente.
+        4. Se a fase for STOP, para o processo de treino.
+        """
+        try:
+            payload = json.loads(msg.payload.decode())
             config_recebida = payload.get("config", {})
             
             if "mode" in config_recebida:
@@ -104,6 +114,7 @@ class Model_Manager:
                 else:
                     print(f"👷 Sou WORKER (Pipeline). Orquestrador atual: {self.server_ip}")
 
+            cmd = config_recebida.get("cmd", "")
             self.phase = cmd
             print(f"🔄 FASE ALTERADA PARA: {self.phase}")
 
