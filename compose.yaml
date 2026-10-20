@@ -16,7 +16,7 @@ services:
         condition: service_healthy
         
   peer:
-    build: ./client
+    # build: ./client
     container_name: client
     network_mode: "host"
     depends_on:
@@ -31,7 +31,7 @@ services:
     tty: true
 
   pipeline:
-    build: ./pipeline_layer
+    # build: ./pipeline_layer
     container_name: pipeline
     network_mode: "host"
     depends_on:
@@ -48,7 +48,7 @@ services:
       - PYTHONUNBUFFERED=1
 
   aggregation:
-    build: ./aggregation_layer
+    # build: ./aggregation_layer
     container_name: aggregation
     network_mode: "host"
     depends_on:
@@ -66,12 +66,12 @@ services:
   rpi-video-server:
     container_name: rpi-video-server_v${VERSION}
     image: rpi-video-server:v${VERSION}
-    build: ./video_server
+    # build: ./video_server
     ports:
       - ${WEBPAGE_PORT}:8000 # local : dentro do container
     devices:
       - /dev/video0:/dev/video0
-      #- /dev/video2:/dev/video2
+      # - /dev/video2:/dev/video2
     environment:
       CAM0: ${CAM0}
       CAM1: ${CAM1}
@@ -83,7 +83,7 @@ services:
       start_interval: 10s
 
   detector:
-    build: code_detector
+    # build: code_detector
     container_name: detector_container
     devices:
       - /dev/video0:/dev/video0
@@ -105,7 +105,7 @@ services:
         condition: service_healthy
 
   labeler:
-    build: labeling
+    # build: labeling
     container_name: labeler_container
     network_mode: "host"
     depends_on:

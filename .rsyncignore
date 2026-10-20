@@ -1,0 +1,9 @@
+client/config.yaml
+data_exports/
+results/
+__pycache__/
+*.tar
+labeling/global_rules.yaml
+mosquitto
+.git/
+.gitignore

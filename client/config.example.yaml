@@ -2,17 +2,17 @@
 mosquitto_port: 1884
 broadcast_port: 50001
 broadcast_mask: "255.255.255.255"
-peer_ip: # update with the ip of the raspberry
+peer_ip: 192.168.0.105 # update with the ip of the raspberry
 
-node_id: # update with the id of the raspberry
+node_id: 4 # update with the id of the raspberry
 mode: "gossip" #"federated" #"gossip" 
 central_id: 0
 min_peers: 2
 
 # network topology -> verify peer id
 routing_topology:
-  aggregation_topology: [0, 2]
-  pipeline_topology: [0, 2]
+  aggregation_topology: [0, 1, 2, 3]
+  pipeline_topology: [0, 1, 2, 3]
 
 # camera config
 video_path: 
@@ -31,4 +31,4 @@ test_token: "x3idotgrwwr9kc32mfxr"
 # labelling config
 labeling_rules: ../labeling/labeling_rules.yaml
 global_rules: ../labeling/global_rules.yaml
-device_id: "rasp2" 
+device_id: "rasp5" 
