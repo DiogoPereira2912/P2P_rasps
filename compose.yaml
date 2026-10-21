@@ -68,7 +68,7 @@ services:
 
   rpi-video-server:
     image: p2p-rpi:latest
-    container_name: rpi-video-server_v${VERSION}
+    container_name: video_server_p2p
     # build: ./video_server
     ports:
       - ${WEBPAGE_PORT}:8000 # local : dentro do container
