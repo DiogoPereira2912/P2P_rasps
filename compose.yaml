@@ -79,7 +79,7 @@ services:
       CAM0: ${CAM0}
       CAM1: ${CAM1}
     volumes:
-    - /home/aidi/P2P/video_server:/usr/src/app/
+    - /home/aidi/P2P/video_server:/app/video_server
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
       interval: 10s

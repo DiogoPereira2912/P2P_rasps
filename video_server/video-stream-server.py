@@ -26,7 +26,7 @@ async def lifespan(app: FastAPI):
     Lifespan context manager for startup and shutdown events.
     """
     global RELEASED_CAMS
-    if os.path.exists("rois_url0.yaml") or os.path.exists("rois_url1.yaml"):
+    if os.path.exists("/app/video_server/rois_url0.yaml") or os.path.exists("/app/video_server/rois_url1.yaml"):
         print("ENCONTREI")
         cameras.release()
         RELEASED_CAMS = True
