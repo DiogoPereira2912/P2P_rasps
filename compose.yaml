@@ -81,9 +81,11 @@ services:
     volumes:
     - /home/aidi/P2P/video_server:/usr/src/app/
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"] # porta dentro do conatiner
-      start_period: 1m
-      start_interval: 10s
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
 
   detector:
     # build: code_detector
