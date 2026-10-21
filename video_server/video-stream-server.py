@@ -17,7 +17,8 @@ RELEASED_CAMS = False
 MODEL_RESOLUTION = (1080, 1080)
 
 CAM0 = os.environ.get("CAM0", "/dev/video0")
-CAM1 = os.environ.get("CAM1", "/dev/video2")
+# CAM1 = os.environ.get("CAM1", "/dev/video2")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -153,6 +154,7 @@ class CameraManager:
     def all_cams_released(self) -> bool:
         return all(self.released_cameras_status)
 
+
 async def gen_frames(cam_id: int) -> AsyncGenerator[bytes, None]:
     """
     An asynchronous generator function that yields camera frames.
@@ -207,21 +209,25 @@ async def snapshot(cam_id: int) -> Response:
     else:
         return Response(status_code=404, content="Camera frame not available.")
 
+
 # --- MEU --- #
 
+
 @app.post("/upload_roi")
-async def upload_roi_config(video_key: str,  yaml_content: str = Body(..., media_type="text/plain")):
+async def upload_roi_config(
+    video_key: str, yaml_content: str = Body(..., media_type="text/plain")
+):
     """
     Recebe o conteúdo de um ficheiro YAML e guarda-o localmente no Pi.
-    Dá release nas cameras uma de cada vez 
+    Dá release nas cameras uma de cada vez
     Torna a flag RELEASED_CAMS = TRUE, para retornar status:ok no healthcheck
     """
 
     filename = f"rois_{video_key}.yaml"
 
-    cam_id = int(video_key[-1])  
+    cam_id = int(video_key[-1])
     print("Cam ID:", cam_id)
-    
+
     save_path = os.path.join(os.getcwd(), filename)
 
     with open(save_path, "w") as f:
@@ -229,32 +235,28 @@ async def upload_roi_config(video_key: str,  yaml_content: str = Body(..., media
 
     print(f"Configuração de ROI recebida e guardada em: {save_path}")
 
-    cameras.release_camera_by_id(cam_id)    
+    cameras.release_camera_by_id(cam_id)
 
     if cameras.all_cams_released():
         print("All cameras released")
         global RELEASED_CAMS
         RELEASED_CAMS = True
-    
-    return JSONResponse(
-        status_code=200,
-        content={"status": "success"}
-    )
 
+    return JSONResponse(status_code=200, content={"status": "success"})
 
 
 @app.get("/health")
 def health():
     if RELEASED_CAMS:
         return JSONResponse(
-            status_code=200,
-            content={"status": "ready", "cameras": "released"}
+            status_code=200, content={"status": "ready", "cameras": "released"}
         )
     else:
         return JSONResponse(
             status_code=503,  # Service Unavailable
-            content={"status": "not_ready", "cameras": "in_use"}
+            content={"status": "not_ready", "cameras": "in_use"},
         )
+
 
 async def main():
     """
@@ -266,9 +268,10 @@ async def main():
     # Run the server
     await server.serve()
 
+
 if __name__ == "__main__":
-    cameras = CameraManager([CAM0, CAM1])
-    
+    cameras = CameraManager([CAM0])
+
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
