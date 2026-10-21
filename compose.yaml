@@ -31,6 +31,7 @@ services:
     tty: true
 
   pipeline:
+    image: p2p-rpi:latest
     # build: ./pipeline_layer
     container_name: pipeline
     network_mode: "host"
@@ -48,6 +49,7 @@ services:
       - PYTHONUNBUFFERED=1
 
   aggregation:
+    image: p2p-rpi:latest
     # build: ./aggregation_layer
     container_name: aggregation
     network_mode: "host"
@@ -64,8 +66,8 @@ services:
       - PYTHONUNBUFFERED=1
 
   rpi-video-server:
+    image: p2p-rpi:latest
     container_name: rpi-video-server_v${VERSION}
-    image: rpi-video-server:v${VERSION}
     # build: ./video_server
     ports:
       - ${WEBPAGE_PORT}:8000 # local : dentro do container
@@ -84,6 +86,7 @@ services:
 
   detector:
     # build: code_detector
+    image: p2p-rpi:latest
     container_name: detector_container
     devices:
       - /dev/video0:/dev/video0
@@ -106,6 +109,7 @@ services:
 
   labeler:
     # build: labeling
+    image: p2p-rpi:latest
     container_name: labeler_container
     network_mode: "host"
     depends_on:
