@@ -17,6 +17,7 @@ services:
         
   peer:
     # build: ./client
+    image: p2p-rpi:latest
     container_name: client
     network_mode: "host"
     depends_on:
