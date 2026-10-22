@@ -7,7 +7,7 @@ class Peer:
 
     def __init__(self):
 
-        with open("config.yaml", "r") as file:
+        with open("client/config.yaml", "r") as file:
             self.config = load(file, Loader=Loader)
 
         self.mosquitto_port = self.config["mosquitto_port"]
@@ -69,14 +69,14 @@ class Peer:
         listener.start()
 
     def _notify_peers(self):
-            """
-            Troca de informçoes entre peers, envia a porta, node_id E O DEVICE_ID
-            """
-            msg = f"hello {self.mosquitto_port} {self.node_id} {self.device_id}"
-            self.sock_broadcast.sendto(
-                msg.encode(),
-                (self.broadcast_mask, self.broadcast_port),
-            )
+        """
+        Troca de informçoes entre peers, envia a porta, node_id E O DEVICE_ID
+        """
+        msg = f"hello {self.mosquitto_port} {self.node_id} {self.device_id}"
+        self.sock_broadcast.sendto(
+            msg.encode(),
+            (self.broadcast_mask, self.broadcast_port),
+        )
 
     def add_mosquitto_bridge(self, remote_peer_ip, remote_peer_port):
         """
@@ -139,26 +139,32 @@ class Peer:
                     for p in self.known_peers:
                         self.add_mosquitto_bridge(p[0], p[1])
                         if p != peer:
-                            self.sock_broadcast.sendto(f"hi {p[1]} {p[2]} {p[3]}".encode(), (p[0], p[1]))
+                            self.sock_broadcast.sendto(
+                                f"hi {p[1]} {p[2]} {p[3]}".encode(), (p[0], p[1])
+                            )
                     self._broadcast_known_peers_internally()
 
                 if msg.startswith("hello"):
                     self.sock_broadcast.sendto(
-                        f"hi {self.mosquitto_port} {self.node_id} {self.device_id}".encode(), addr
+                        f"hi {self.mosquitto_port} {self.node_id} {self.device_id}".encode(),
+                        addr,
                     )
 
-    def _broadcast_known_peers_internally(self): 
-        """ 
+    def _broadcast_known_peers_internally(self):
+        """
         Envia a lista de IPs para os outros módulos (Pipeline/Agg) usarem.
         """
         ip_list = sorted([(p[0], p[2], p[3]) for p in self.known_peers])
         known_peers_payload = json.dumps(ip_list)
-        self.mqtt_com.client.publish(payload = known_peers_payload, topic = "system/peers", retain=True)
+        self.mqtt_com.client.publish(
+            payload=known_peers_payload, topic="system/peers", retain=True
+        )
+
 
 if __name__ == "__main__":
-    peer = Peer() 
+    peer = Peer()
     try:
         while True:
-            time.sleep(1) 
+            time.sleep(1)
     except KeyboardInterrupt:
         print("\nA desligar o Peer...")

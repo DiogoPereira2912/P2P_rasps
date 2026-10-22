@@ -16,25 +16,29 @@ services:
         condition: service_healthy
         
   peer:
-    # build: ./client
     image: p2p-rpi:latest
     container_name: client
+    working_dir: /app     
+    command: python3 client/peer.py                
     network_mode: "host"
     depends_on:
       broker:
         condition: service_started
     environment:
       - BROKER_HOST=broker
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app
     volumes:
-      - ./client:/app
+      - ./client:/app/client  
       - ./mosquitto:/app/mosquitto
       - /var/run/docker.sock:/var/run/docker.sock
     tty: true
 
   pipeline:
     image: p2p-rpi:latest
-    # build: ./pipeline_layer
     container_name: pipeline
+    working_dir: /app     
+    command: python3 pipeline_layer/pipeline_probs.py             
     network_mode: "host"
     depends_on:
       peer:
@@ -45,14 +49,18 @@ services:
       - ./mosquitto:/app/mosquitto
       - ./data_exports:/app/data_exports
       - ./aggregation_layer:/app/aggregation_layer
+      - ./pipeline_layer:/app/pipeline_layer  
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app
+
 
   aggregation:
     image: p2p-rpi:latest
-    # build: ./aggregation_layer
     container_name: aggregation
+    working_dir: /app     
+    command: python3 aggregation_layer/aggregation_probs.py           
     network_mode: "host"
     depends_on:
       peer:
@@ -62,38 +70,39 @@ services:
       - ./data_exports:/app/data_exports
       - ./labeling:/app/labeling
       - ./mosquitto:/app/mosquitto
+      - ./aggregation_layer:/app/aggregation_layer 
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app
+
 
   rpi-video-server:
-    image: p2p-rpi:latest
     container_name: video_server_p2p
-    # build: ./video_server
+    image: p2p-rpi:latest    
+    working_dir: /usr/src/app/
+    command: python3 video-stream-server.py
     ports:
-      - ${WEBPAGE_PORT}:8000 # local : dentro do container
+      - ${WEBPAGE_PORT}:8000
     devices:
       - /dev/video0:/dev/video0
-      # - /dev/video2:/dev/video2
     environment:
       CAM0: ${CAM0}
       CAM1: ${CAM1}
     volumes:
-    - /home/aidi/P2P/video_server:/app/video_server
+      - /home/aidi/P2P/video_server:/usr/src/app/
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
+      start_period: 1m
       interval: 10s
-      timeout: 5s
-      retries: 30
-      start_period: 10s
 
   detector:
-    # build: code_detector
     image: p2p-rpi:latest
     container_name: detector_container
+    working_dir: /app           
+    command: python3 code_detector/yolo_pose.py             
     devices:
       - /dev/video0:/dev/video0
-      # - /dev/video2:/dev/video2
       - /dev/hailo0:/dev/hailo0     
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix
@@ -104,16 +113,21 @@ services:
       - ./client:/app/client
       - ./video_server:/app/video_server
       - ./data_exports:/app/data_exports
+      - ./code_detector:/app/code_detector  
     privileged: true
     ipc: host
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app
     depends_on:
       rpi-video-server: 
         condition: service_healthy
 
   labeler:
-    # build: labeling
     image: p2p-rpi:latest
     container_name: labeler_container
+    working_dir: /app                
+    command: python3 labeling/labeling_batch.py              
     network_mode: "host"
     depends_on:
       rpi-video-server: 
@@ -125,16 +139,17 @@ services:
       - ./results:/app/results
     environment:
       - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app
 
   cadvisor:
-      image: gcr.io/cadvisor/cadvisor:v0.47.0 # Versão ARM para Raspberry Pi
-      container_name: cadvisor
-      ports:
-        - "8080:8080"
-      volumes:
-        - /:/rootfs:ro
-        - /var/run:/var/run:rw
-        - /sys:/sys:ro
-        - /var/lib/docker/:/var/lib/docker:ro
-        - /etc/machine-id:/etc/machine-id:ro
-      restart: always
+    image: gcr.io/cadvisor/cadvisor:v0.47.0
+    container_name: cadvisor
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /etc/machine-id:/etc/machine-id:ro
+    restart: always

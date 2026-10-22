@@ -1,14 +1,15 @@
 import time, random, yaml, cv2, os, json, uuid
 import numpy as np
 import pandas as pd
-from datetime import datetime 
-from ultralytics import YOLO 
+from datetime import datetime
+from ultralytics import YOLO
 from ROI import ROIHandler
 from tb_gateway_mqtt import TBGatewayMqttClient
 from deltalake.writer import write_deltalake
 from client.mqtt_layer import Communication_Layer
 
 ROIS_CONFIG_PATH = "video_server/rois_url0.yaml"
+
 
 class StereoDetector:
     def __init__(self, config_paths, roi_path, model_params):
@@ -19,7 +20,7 @@ class StereoDetector:
         with open(roi_path, "r") as file:
             roi_data = yaml.safe_load(file)
 
-        self.model = YOLO(model_params["model_path"]) 
+        self.model = YOLO(model_params["model_path"])
         print("Modelo carregado!")
 
         # --- STREAMLIT ---
@@ -38,17 +39,19 @@ class StereoDetector:
         # --- Image Configs ---
         self.resolution = (
             self.config["resolution"]["height"],
-            self.config["resolution"]["width"]
+            self.config["resolution"]["width"],
         )
 
         # --- Default Payload ---
-        self.default_payload = {                            
+        self.default_payload = {
             "ts": None,
             "roi_id": 1000000,
             "label_type": "none",
             "confidence": -999,
             "bbox_coords": (-500, -500, -500, -500),
-            "keypoints": [[-1, -1, -1] for _ in range(17)]  # Lista de 17 keypoints padrão
+            "keypoints": [
+                [-1, -1, -1] for _ in range(17)
+            ],  # Lista de 17 keypoints padrão
         }
 
         # --- Export to parquet --- #
@@ -60,13 +63,13 @@ class StereoDetector:
         # --- Thingsboard ---
         # self.tb_client = self.config["tb_ip"]
         # self.tb_token = self.config["tb_token"]
-        
+
         # self.tb_gateway = TBGatewayMqttClient(
         #     host=self.config["tb_ip"],
         #     username=self.config["tb_token"],
         # )
         # self.device_name = f"RiscDetector - {self.config['device_id']}"
-        
+
         # try:
         #     self.tb_gateway.connect()
         #     self.tb_gateway.gw_connect_device(self.device_name)
@@ -76,8 +79,8 @@ class StereoDetector:
         #     print(f"Erro na conexão MQTT: {e}")
 
         # --- Thingsboard Status ---
-        self.no_danger_frames = 0 
-        self.status = False 
+        self.no_danger_frames = 0
+        self.status = False
 
         # --- Video Capture ---
         self.cap = cv2.VideoCapture(self.config["video_path"][0])
@@ -98,7 +101,9 @@ class StereoDetector:
             qos=1,
         )
         self.yolo_mqtt_com.subscribe("system/control/#")
-        self.yolo_mqtt_com.client.message_callback_add("system/control/#", self.on_control_message)
+        self.yolo_mqtt_com.client.message_callback_add(
+            "system/control/#", self.on_control_message
+        )
 
     def on_control_message(self, client, userdata, msg):
         """
@@ -108,20 +113,22 @@ class StereoDetector:
             print(f"📩 MENSAGEM RECEBIDA: {msg.payload}")
             payload = json.loads(msg.payload.decode())
             cmd = payload.get("command")
-            
+
             self.phase = cmd
 
             if self.phase == "COLLECTION":
                 cfg = payload.get("config", {})
                 self.save_interval = cfg.get("save_interval", 5)
                 self.max_saves = cfg.get("max_saves", 10)
-                
+
                 self.saved_count = 0
                 self.last_save_time = time.time()
-                self.parquet_buffer = [] 
-                
-                self.is_running = True 
-                print(f"🟢 INICIANDO: {self.max_saves} batches a cada {self.save_interval}s")
+                self.parquet_buffer = []
+
+                self.is_running = True
+                print(
+                    f"🟢 INICIANDO: {self.max_saves} batches a cada {self.save_interval}s"
+                )
 
             elif self.phase == "INFERENCE":
                 self.is_running = True
@@ -130,7 +137,7 @@ class StereoDetector:
             elif self.phase == "STOP":
                 self.is_running = False
                 print("🔴 PARAGEM FORÇADA RECEBIDA")
-                
+
         except Exception as e:
             print(f"Erro ao processar comando: {e}")
 
@@ -141,7 +148,7 @@ class StereoDetector:
         return {
             "raspberry_id": self.config["device_id"],
             "timestamp": datetime.utcnow().isoformat() + "Z",
-            "detections": detections
+            "detections": detections,
         }
 
     # def save_parquet(self):
@@ -151,7 +158,7 @@ class StereoDetector:
     #     detections_df = pd.DataFrame(self.parquet_buffer)
     #     if 'bbox_coords' in detections_df.columns:
     #         detections_df[['box_x1', 'box_y1', 'box_x2', 'box_y2']] = pd.DataFrame(
-    #             detections_df['bbox_coords'].tolist(), 
+    #             detections_df['bbox_coords'].tolist(),
     #             index=detections_df.index
     #         )
     #         detections_df = detections_df.drop(columns=['bbox_coords'])
@@ -161,13 +168,16 @@ class StereoDetector:
 
     def send_tb(self, payload):
         try:
-            self.tb_gateway.gw_send_telemetry(f"RiscDetector - {self.config['device_id']}", {"ts": int(round(time.time() * 1000)), "values": payload})
+            self.tb_gateway.gw_send_telemetry(
+                f"RiscDetector - {self.config['device_id']}",
+                {"ts": int(round(time.time() * 1000)), "values": payload},
+            )
         except:
             pass
 
     def run(self):
-        try:             
-            payload = {"status": False, "random": random.random()}                    
+        try:
+            payload = {"status": False, "random": random.random()}
             self.send_tb(payload)
             print("ENVIOU OFF INICIAL")
         except Exception as ee:
@@ -175,8 +185,8 @@ class StereoDetector:
 
         while True:
             if not self.is_running:
-                self.cap.grab() 
-                time.sleep(0.5) 
+                self.cap.grab()
+                time.sleep(0.5)
                 continue
 
             else:
@@ -189,32 +199,32 @@ class StereoDetector:
                 frame_resized = cv2.resize(frame, self.resolution)
                 danger_detected = False
                 detections = []
-    
+
                 detection_time_start = time.time()
 
-                for roi_id, roi_handler in enumerate(self.roi_handlers, start=1): 
+                for roi_id, roi_handler in enumerate(self.roi_handlers, start=1):
                     cropped = roi_handler.crop_frame(frame_resized)
                     if cropped is None or cropped.size == 0:
                         continue
 
-                    results = self.model(cropped, verbose=False) 
+                    results = self.model(cropped, verbose=False)
 
                     for result in results:
-                        boxes = result.boxes # bbox data
-                        keypoints = result.keypoints # Pose data
+                        boxes = result.boxes  # bbox data
+                        keypoints = result.keypoints  # Pose data
 
                         for i, box in enumerate(boxes):
                             cls_id = int(box.cls[0])
-                            if cls_id != 0: 
+                            if cls_id != 0:
                                 continue
 
                             x1, y1, x2, y2 = map(int, box.xyxy[0])
-                            cx, cy = (x1 + x2) // 2, (y1 + y2) // 2 # centroid
+                            cx, cy = (x1 + x2) // 2, (y1 + y2) // 2  # centroid
                             conf = float(box.conf[0])
 
                             kpts = []
                             if keypoints is not None:
-                                raw_kpts = keypoints.data[i].tolist() 
+                                raw_kpts = keypoints.data[i].tolist()
                                 kpts = raw_kpts
                                 danger_detected = True
                                 det_data = {
@@ -223,10 +233,12 @@ class StereoDetector:
                                     "label_type": "person",
                                     "confidence": conf,
                                     "bbox_coords": (x1, y1, x2, y2),
-                                    "keypoints": kpts 
-                                    }
+                                    "keypoints": kpts,
+                                }
                                 detections.append(det_data)
-                                cv2.rectangle(frame_resized, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                                cv2.rectangle(
+                                    frame_resized, (x1, y1), (x2, y2), (0, 255, 0), 2
+                                )
                                 ### ---- to PARQUET ---- ###
                                 self.parquet_buffer.append(det_data)
 
@@ -237,20 +249,27 @@ class StereoDetector:
                         self.parquet_buffer.append(default_entry)
 
                     if self.phase == "INFERENCE":
-                        self.yolo_mqtt_com.publish(self.parquet_buffer, topic="internal/raw_detections")
+                        self.yolo_mqtt_com.publish(
+                            self.parquet_buffer, topic="internal/raw_detections"
+                        )
                         self.parquet_buffer = []
 
                     if self.phase == "COLLECTION":
-                        if time.time() - self.last_save_time >= self.save_interval and self.saved_count < self.max_saves:
-                            self.yolo_mqtt_com.publish(self.parquet_buffer, topic="internal/raw_detections")
+                        if (
+                            time.time() - self.last_save_time >= self.save_interval
+                            and self.saved_count < self.max_saves
+                        ):
+                            self.yolo_mqtt_com.publish(
+                                self.parquet_buffer, topic="internal/raw_detections"
+                            )
                             self.parquet_buffer = []
                             self.last_save_time = time.time()
                             self.saved_count += 1
                             if self.saved_count >= self.max_saves:
                                 self.is_running = False
-                    
+
                     print("DETECTIONS", detections)
-                    if cv2.waitKey(1) & 0xFF == ord('q'):
+                    if cv2.waitKey(1) & 0xFF == ord("q"):
                         break
                     payload = self.build_payload(detections)
                     if danger_detected:
@@ -259,25 +278,32 @@ class StereoDetector:
                         try:
                             ii = 0
                             for detection in detections:
-                                det_copy = detection.copy() # pra n alterar o buffer parquet
+                                det_copy = (
+                                    detection.copy()
+                                )  # pra n alterar o buffer parquet
                                 det_copy["status"] = True
                                 det_copy["random"] = random.random()
                                 det_copy["polygonID"] = ii
                                 self.send_tb(det_copy)
                                 ii += 1
-                                print(f"⚠️ ENVIOU ON (Pessoa detetada ROI {detection['roi_id']})")
+                                print(
+                                    f"⚠️ ENVIOU ON (Pessoa detetada ROI {detection['roi_id']})"
+                                )
                         except Exception as ee:
                             print(f"EXCEPTION: {ee}")
                     else:
                         NN = 10
-                        if (self.status==True and self.no_danger_frames < NN):
+                        if self.status == True and self.no_danger_frames < NN:
                             self.no_danger_frames += 1
                         else:
                             self.status = False
-                            if (self.no_danger_frames==NN):
+                            if self.no_danger_frames == NN:
                                 self.no_danger_frames += 1
-                                try:             
-                                    payload = {"status": False, "random": random.random()}                    
+                                try:
+                                    payload = {
+                                        "status": False,
+                                        "random": random.random(),
+                                    }
                                     self.send_tb(payload)
                                     print("ENVIOU OFF")
                                 except Exception as ee:
@@ -294,13 +320,12 @@ class StereoDetector:
             pass
         cv2.destroyAllWindows()
 
+
 if __name__ == "__main__":
-    config_paths = {
-        "config": "client/config.yaml"
-    }
+    config_paths = {"config": "client/config.yaml"}
     roi_path = ROIS_CONFIG_PATH
     model_params = {
-        "model_path": "models/yolo11n-pose.pt", 
+        "model_path": "code_detector/models/yolo11n-pose.pt",
     }
 
     detector = StereoDetector(config_paths, roi_path, model_params)
