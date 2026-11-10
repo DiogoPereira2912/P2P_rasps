@@ -8,7 +8,7 @@ import numpy as np
 from deltalake.writer import write_deltalake
 from aggregation_algs.aggregation_utils import resolve_targets_by_index, load_class_mappings
 
-import warnings
+import warnings 
 warnings.filterwarnings("ignore")
 
 WINDOW_DURATION = 5.0 # Duração da janela de agregação em segundos

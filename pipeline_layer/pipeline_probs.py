@@ -1,4 +1,9 @@
-from data_utils import data_split, load_data, resolve_targets_by_index, load_class_mappings
+from data_utils import (
+    data_split,
+    load_data,
+    resolve_targets_by_index,
+    load_class_mappings,
+)
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import Pipeline
@@ -10,13 +15,15 @@ import pandas as pd
 from prometheus_client import start_http_server, Counter
 
 import warnings
+
 warnings.filterwarnings("ignore")
- 
-MODELS = {'RandomForest': RandomForestClassifier}
+
+MODELS = {"RandomForest": RandomForestClassifier}
+
 
 class Model_Manager:
 
-    def __init__(self): 
+    def __init__(self):
 
         with open("client/config.yaml", "r") as file:
             self.config = load(file, Loader=Loader)
@@ -26,30 +33,34 @@ class Model_Manager:
         self.broadcast_mask = self.config["broadcast_mask"]
         self.peer_ip = self.config["peer_ip"]
         self.broker_id = self.peer_ip.replace(".", "_")
- 
+
         self.node_id = self.config["node_id"]
         self.mode = self.config["mode"]
         self.central_id = self.config["central_id"]
-        self.server_ip = None 
-        self.server_id = None 
-        
-        self.is_dynamic_server = False 
+        self.server_ip = None
+        self.server_id = None
+
+        self.is_dynamic_server = False
 
         self.is_training = False
         self.current_peer_list = []
         self.min_peers = self.config["min_peers"]
-        self.pipeline_dest_indices = self.config["routing_topology"]["pipeline_topology"]
+        self.pipeline_dest_indices = self.config["routing_topology"][
+            "pipeline_topology"
+        ]
 
-        self.label_map, _, self.class_list = load_class_mappings(yaml_path="labeling/global_rules.yaml")
+        self.label_map, _, self.class_list = load_class_mappings(
+            yaml_path="labeling/global_rules.yaml"
+        )
         self.models_dump_path = f"models/"
         self.loaded_model = None
         self.phase = None
 
         # Prometheus metrics
         self.frames_counter = Counter(
-            'aidi_frames_processed_total', 
-            'Total de frames inferidos no nó', 
-            ['node_id', 'algo_mode']
+            "aidi_frames_processed_total",
+            "Total de frames inferidos no nó",
+            ["node_id", "algo_mode"],
         )
 
         self._setup_mqtt_client()
@@ -86,7 +97,9 @@ class Model_Manager:
         self.mqtt_com.subscribe("system/peers")
         self.mqtt_com.subscribe("system/inference")
         self.mqtt_com.subscribe("system/control/#")
-        self.mqtt_com.client.message_callback_add("system/control/#", self.on_control_phase_message)
+        self.mqtt_com.client.message_callback_add(
+            "system/control/#", self.on_control_phase_message
+        )
 
     def on_control_phase_message(self, client, userdata, msg):
         """
@@ -99,37 +112,45 @@ class Model_Manager:
         try:
             payload = json.loads(msg.payload.decode())
             config_recebida = payload.get("config", {})
-            
+
             if "mode" in config_recebida:
-                self.mode = "federated" if config_recebida["mode"] == "federated" else "gossip"
+                self.mode = (
+                    "federated" if config_recebida["mode"] == "federated" else "gossip"
+                )
                 print(f"⚙️️ Chosen mode: {self.mode.upper()}")
-                
+
             if "central_ip" in config_recebida:
                 self.server_ip = config_recebida["central_ip"]
                 self.server_id = self.server_ip.replace(".", "_")
                 self.is_dynamic_server = True
-                
-                if self.peer_ip == self.server_ip:
-                    print("👑 Fui promovido a MAIN SERVER (Pipeline) pela Control Tower!")
-                else:
-                    print(f"👷 Sou WORKER (Pipeline). Orquestrador atual: {self.server_ip}")
 
-            cmd = config_recebida.get("cmd", "")
+                if self.peer_ip == self.server_ip:
+                    print(
+                        "👑 Fui promovido a MAIN SERVER (Pipeline) pela Control Tower!"
+                    )
+                else:
+                    print(
+                        f"👷 Sou WORKER (Pipeline). Orquestrador atual: {self.server_ip}"
+                    )
+
+            cmd = config_recebida.get("command", "")
             self.phase = cmd
             print(f"🔄 FASE ALTERADA PARA: {self.phase}")
 
             if cmd == "TRAIN":
                 threading.Thread(target=self.run_model_training).start()
-            
+
             elif cmd in ["INFERENCE", "METRICS"]:
                 if not self.loaded_model:
                     self._try_load_existing_model()
                     if not self.loaded_model:
-                        print("⚠️ AVISO: Modo Inferência ativado mas SEM MODELO treinado.")
+                        print(
+                            "⚠️ AVISO: Modo Inferência ativado mas SEM MODELO treinado."
+                        )
 
             elif cmd == "STOP":
                 print("🛑 Paragem recebida.")
-                
+
         except Exception as e:
             print(f"Erro ao processar comando: {e}")
 
@@ -143,18 +164,18 @@ class Model_Manager:
         """
         try:
             if os.path.exists(filepath):
-                model = pickle.load(open(filepath, 'rb'))
+                model = pickle.load(open(filepath, "rb"))
                 return model
         except Exception as e:
             print(f"Erro ao carregar o modelo do ficheiro {filepath}: {e}")
             return None
-        
+
     def _verify_central_server(self, peers_list):
 
         if self.is_dynamic_server:
             self.mqtt_com.subscribe(topic="+/train")
             return
-            
+
         if self.node_id == self.central_id:
             self.server_ip = self.peer_ip
             self.server_id = self.server_ip.replace(".", "_")
@@ -193,13 +214,13 @@ class Model_Manager:
         """
         grid_search_model = GridSearchCV(
             estimator=pipeline,
-            param_grid = { 
-                'classifier__n_estimators': [200, 500],
-                'classifier__max_features': ['auto', 'sqrt', 'log2'],
-                'classifier__max_depth' : [4,5,6,7,8],
-                'classifier__criterion' :['gini', 'entropy']
+            param_grid={
+                "classifier__n_estimators": [200, 500],
+                "classifier__max_features": ["auto", "sqrt", "log2"],
+                "classifier__max_depth": [4, 5, 6, 7, 8],
+                "classifier__criterion": ["gini", "entropy"],
             },
-            cv=5, 
+            cv=5,
             scoring="accuracy",
             n_jobs=-1,
             verbose=1,
@@ -222,48 +243,46 @@ class Model_Manager:
         return train_accuracy, test_accuracy
 
     def run_model_training(self):
-        '''
-            Executa a pipeline de treino com os melhores parâmetros encontrados.
-            1. Constroi a pipeline.
-            2. Realiza o hyperparameter tuning usando a grid adaptativa.
-            3. Treina o modelo com os melhores parâmetros.
-            4. Avalia o modelo nos dados de treino e teste.
-            5. Salva o modelo treinado em um ficheiro pickle.
-        '''
+        """
+        Executa a pipeline de treino com os melhores parâmetros encontrados.
+        1. Constroi a pipeline.
+        2. Realiza o hyperparameter tuning usando a grid adaptativa.
+        3. Treina o modelo com os melhores parâmetros.
+        4. Avalia o modelo nos dados de treino e teste.
+        5. Salva o modelo treinado em um ficheiro pickle.
+        """
         df = load_data()
         X_train, X_test, y_train, y_test = data_split(df, self.label_map)
         for name, model_class in MODELS.items():
-            pipeline = self.build_pipeline(
-                scaler=StandardScaler(), model= model_class()
-            )
+            pipeline = self.build_pipeline(scaler=StandardScaler(), model=model_class())
             self.best_params, self.best_model = self.param_tuning(
                 pipeline, X_train, y_train
             )
             # filename = f"best_{name}_{self.broker_id}.pkl"
             # filepath = self.models_dump_path + filename
             # pickle.dump(self.best_model, open(filepath, 'wb'))
-        
+
         self.loaded_model = self.best_model
         print("✅ Modelo treinado com sucesso.")
 
     def run_classification(self, data):
-        '''
-            Executa a classificação nos dados de teste e publica as predições.
-            1. Força o cálculo das probabilidades e predições.
-            2. Prepara a payload com as predições.
-            3. Publica as predições para os destinos definidos.
-        '''
+        """
+        Executa a classificação nos dados de teste e publica as predições.
+        1. Força o cálculo das probabilidades e predições.
+        2. Prepara a payload com as predições.
+        3. Publica as predições para os destinos definidos.
+        """
         df = pd.DataFrame(data)
-        df = df.drop(columns=['ts'])
-        pred_probs = self.loaded_model.predict_proba(df) 
-        preds = self.loaded_model.predict(df) 
-        
+        df = df.drop(columns=["ts"])
+        pred_probs = self.loaded_model.predict_proba(df)
+        preds = self.loaded_model.predict(df)
+
         model_preds_payload = {
             "id": self.node_id,
             "ts": time.time(),
             "data": data,
             "pred_probs": pred_probs.tolist(),
-            "preds": preds.tolist()
+            "preds": preds.tolist(),
         }
         print(f"📊 Publicando Predições: {pred_probs}")
 
@@ -273,9 +292,13 @@ class Model_Manager:
         if self.mode == "federated":
             self.mqtt_com.publish(model_preds_payload, topic=f"{self.broker_id}/agg")
         else:
-            targets = resolve_targets_by_index(self.current_peer_list, self.pipeline_dest_indices)
+            targets = resolve_targets_by_index(
+                self.current_peer_list, self.pipeline_dest_indices
+            )
             if not targets:
-                self.mqtt_com.publish(model_preds_payload, topic=f"{self.broker_id}/agg")
+                self.mqtt_com.publish(
+                    model_preds_payload, topic=f"{self.broker_id}/agg"
+                )
             else:
                 for ip in targets:
                     target_id = ip.replace(".", "_")
@@ -312,7 +335,10 @@ class Model_Manager:
                         msg_ts = data["ts"]
                         new_labelled_df = data["labelled_df"]
 
-                        if node_id in last_processed_ts and msg_ts <= last_processed_ts[node_id]:
+                        if (
+                            node_id in last_processed_ts
+                            and msg_ts <= last_processed_ts[node_id]
+                        ):
                             self.mqtt_com.msg_queue.task_done()
                             continue
 
@@ -323,13 +349,14 @@ class Model_Manager:
                         self.mqtt_com.msg_queue.task_done()
 
     def _start_pipe_worker(self):
-        '''
+        """
         Inicia o worker que processa mensagens de pipeline.
-        '''
+        """
         pipe_thread = threading.Thread(target=self.pipe_worker_on_message)
         pipe_thread.start()
 
-if __name__ == "__main__": 
+
+if __name__ == "__main__":
     manager = Model_Manager()
     try:
         while True:

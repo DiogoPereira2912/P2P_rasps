@@ -114,7 +114,7 @@ class StereoDetector:
             payload = json.loads(msg.payload.decode())
             cmd = payload.get("command")
 
-            self.phase = cmd
+            self.phase = cmd 
 
             if self.phase == "COLLECTION":
                 cfg = payload.get("config", {})
