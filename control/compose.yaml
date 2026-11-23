@@ -1,0 +1,45 @@
+services:
+  control_center:
+    build: ./streamlit
+    container_name: streamlit_control_center
+    working_dir: /app/streamlit
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./:/app
+      # Raiz do repo: inventory.yaml + tools/deploy.sh (botão "Atualizar Código").
+      # Escrita necessária: o deploy regenera build/ e control/prometheus.yaml.
+      - ../:/repo
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ~/.ssh:/root/.ssh:ro
+    environment:
+      - REPO_PATH=/repo
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yaml:/etc/prometheus/prometheus.yaml # gerado por tools/gen_configs.py
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yaml'
+      - '--storage.tsdb.path=/prometheus'
+    restart: always
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    restart: always
+
+volumes:
+  prometheus_data:
+  grafana_data:

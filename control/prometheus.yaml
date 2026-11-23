@@ -1,0 +1,28 @@
+# ============================================================
+# GERADO AUTOMATICAMENTE por tools/gen_configs.py — NÃO EDITAR.
+# Altera inventory.yaml e volta a correr o script.
+# ============================================================
+global:
+  scrape_interval: 2s
+  evaluation_interval: 2s
+scrape_configs:
+- job_name: prometheus
+  static_configs:
+  - targets:
+    - localhost:9090
+- job_name: hardware_cadvisor
+  static_configs:
+  - targets:
+    - 192.168.0.110:8080
+    - 192.168.0.111:8080
+    - 192.168.0.112:8080
+    - 192.168.0.113:8080
+    - 192.168.0.114:8080
+- job_name: throughput_python
+  static_configs:
+  - targets:
+    - 192.168.0.110:8000
+    - 192.168.0.111:8000
+    - 192.168.0.112:8000
+    - 192.168.0.113:8000
+    - 192.168.0.114:8000

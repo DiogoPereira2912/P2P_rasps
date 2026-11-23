@@ -1,0 +1,6 @@
+# O IP do Pi vem do inventory.yaml (raiz do repo), a partir do nome do nó
+# passado na linha de comandos: python3 ROI_selection_class.py rasp2
+video_port: 8001 # = WEBPAGE_PORT no .env (porta do video_server no Pi)
+resolution:
+  height: 1080
+  width: 1920

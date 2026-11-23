@@ -1,0 +1,69 @@
+# =====================================================================
+# INVENTÁRIO DA FROTA — única fonte de verdade sobre os Raspberries
+# =====================================================================
+# Tudo o que é específico de cada nó (IP, node_id, device_id) vive AQUI.
+# Os ficheiros por nó são gerados com:
+#     python3 tools/gen_configs.py
+# e ficam em build/ (não vai para o git nem é editado à mão).
+# =====================================================================
+
+# --- Acesso SSH / deploy (iguais em todos os nós) ---
+ssh_user: aidi
+remote_path: /home/aidi/P2P
+
+# --- Valores comuns a todos os nós (vão para client/config.yaml) ---
+defaults:
+  mosquitto_port: 1884
+  broadcast_port: 50001
+  broadcast_mask: "255.255.255.255"
+  mode: gossip            # gossip | federated
+  central_id: 0           # node_id do servidor central no modo federated
+  min_peers: 2
+  video_path:
+    - /dev/video0
+  resolution:
+    height: 1920
+    width: 1080
+  anonymous: true
+  labeling_rules: ../labeling/labeling_rules.yaml
+  global_rules: ../labeling/global_rules.yaml
+
+  # Topologia por omissão: null = enviar para TODOS os outros nós (exclui o próprio,
+  # para evitar dados duplicados). Pode ser substituída por nó (ver rasp4 em baixo).
+  routing_topology:
+    aggregation_topology: null
+    pipeline_topology: null
+
+  # --- ThingsBoard (ainda não usado no código, mas já fica na config por defeito) ---
+  # Os tokens NÃO ficam aqui: vão em inventory.secrets.yaml (local, fora do git).
+  tb_ip: "172.31.1.104"
+  tb_token: ""
+  test_ip: "demo.thingsboard.io"
+  test_token: ""
+
+# --- Os nós ---
+# name     -> usado como device_id (nome das pastas em data_exports, chaves nas regras)
+# ip       -> peer_ip (fixar por reserva DHCP no router da rede de desenvolvimento)
+# node_id  -> índice usado nas topologias e no central_id
+# ⚠️ CONFIRMAR: mapeamento assumido a partir de update_git.sh / gossip_ui.py (.110–.114)
+nodes:
+  rasp1:
+    ip: 192.168.0.110
+    node_id: 0
+  rasp2:
+    ip: 192.168.0.111
+    node_id: 1
+  rasp3:
+    ip: 192.168.0.112
+    node_id: 2
+  rasp4:
+    ip: 192.168.0.113
+    node_id: 3
+    # Exemplo de override só para este nó:
+    # routing_topology:
+    #   aggregation_topology: [0, 1, 4]
+    #   pipeline_topology: [0, 1, 4]
+    # (tokens por nó vão em inventory.secrets.yaml, na mesma estrutura)
+  rasp5:
+    ip: 192.168.0.114
+    node_id: 4

@@ -1,0 +1,10 @@
+services:
+  p2p_img:
+    build:
+      context: ./base
+    image: p2p-rpi
+    container_name: p2p_img
+    command: bash
+    network_mode: host
+    ipc: host
+    privileged: true

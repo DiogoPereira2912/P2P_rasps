@@ -5,3 +5,7 @@ __pycache__/
 *.tar
 labeling/global_rules.yaml
 models/
+.DS_Store
+control/imgs/
+build/
+inventory.secrets.yaml

@@ -8,3 +8,11 @@ mosquitto
 .git/
 .gitignore
 models/
+control/
+roi_selection/
+.DS_Store
+build/
+tools/
+inventory.yaml
+inventory.secrets.yaml
+docs/
