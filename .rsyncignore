@@ -7,3 +7,4 @@ labeling/global_rules.yaml
 mosquitto
 .git/
 .gitignore
+models/

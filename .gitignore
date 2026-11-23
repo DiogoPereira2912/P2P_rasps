@@ -4,3 +4,4 @@ results/
 __pycache__/
 *.tar
 labeling/global_rules.yaml
+models/

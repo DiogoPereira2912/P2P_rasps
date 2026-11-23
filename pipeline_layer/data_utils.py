@@ -3,8 +3,11 @@ from sklearn.datasets import load_breast_cancer, load_iris, load_wine, load_digi
 from deltalake import DeltaTable
 import yaml
 
-def load_data():
-    df = DeltaTable("data_exports/local_output_rasp2/").to_pandas()
+def load_data(device_id):
+    """
+    Carrega o dataset de treino local deste nó (escrito pelo labeler na fase COLLECTION).
+    """
+    df = DeltaTable(f"data_exports/local_output_{device_id}/").to_pandas()
     return df
 
 def data_split(df, label_map, test_size=0.2, random_state=42):

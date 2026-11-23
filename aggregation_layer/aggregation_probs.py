@@ -261,7 +261,12 @@ class Aggregator:
                     priority_map=self.priority_map
                 )
 
-                final_prob_idx = np.argmax(final_probs[0]) if final_probs else None
+                # final_probs pode ser lista (avg) ou np.ndarray (fallback) -> não usar "if final_probs"
+                final_prob_idx = (
+                    int(np.argmax(final_probs[0]))
+                    if final_probs is not None and len(final_probs) > 0
+                    else None
+                )
                 final_label = self.reverse_label_map.get(final_prob_idx, "UNKNOWN")
 
                 if self.phase in ["INFERENCE", "METRICS"]:

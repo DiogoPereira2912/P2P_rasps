@@ -49,7 +49,8 @@ services:
       - ./mosquitto:/app/mosquitto
       - ./data_exports:/app/data_exports
       - ./aggregation_layer:/app/aggregation_layer
-      - ./pipeline_layer:/app/pipeline_layer  
+      - ./pipeline_layer:/app/pipeline_layer
+      - ./models:/app/models # modelos treinados persistem entre "docker compose down/up"
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - PYTHONUNBUFFERED=1
@@ -142,7 +143,7 @@ services:
       - PYTHONPATH=/app
 
   cadvisor:
-    image: gcr.io/cadvisor/cadvisor:v0.47.0
+    image: gcr.io/cadvisor/cadvisor:v0.49.2 # tem de coincidir com o .tar levado para os Pis (pull_imgs.sh)
     container_name: cadvisor
     ports:
       - "8080:8080"

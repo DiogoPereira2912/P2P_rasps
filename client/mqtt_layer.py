@@ -1,4 +1,4 @@
-import json, queue, uuid
+import json, queue, time, uuid
 from paho.mqtt import client as mqtt_client
 
 class Communication_Layer:

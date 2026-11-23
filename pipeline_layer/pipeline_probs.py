@@ -79,7 +79,7 @@ class Model_Manager:
             start_http_server(8000)
             print("📡 Prometheus exporter a correr na porta 8000")
         except Exception as e:
-            print(f"⚠️️ Aviso: Não foi possível iniciar o Prometheus exporter: {e}")
+            print(f"⚠ Aviso: Não foi possível iniciar o Prometheus exporter: {e}")
 
     def _setup_mqtt_client(self):
         """
@@ -104,20 +104,23 @@ class Model_Manager:
     def on_control_phase_message(self, client, userdata, msg):
         """
         Processa mensagens de controlo recebidas via MQTT.
-        1. Atualiza a fase de operação (TRAIN, INFERENCE, METRICS ou STOP).
-        2. Se a fase for TRAIN, inicia o treino do modelo.
-        3. Se a fase for INFERENCE ou METRICS, tenta carregar um modelo existente.
-        4. Se a fase for STOP, para o processo de treino.
         """
         try:
             payload = json.loads(msg.payload.decode())
+
+            cmd = payload.get("command", "")
+            self.phase = cmd
+            print(f"🔄 FASE ALTERADA PARA: {self.phase}")
+
             config_recebida = payload.get("config", {})
 
             if "mode" in config_recebida:
                 self.mode = (
-                    "federated" if config_recebida["mode"] == "federated" else "gossip"
+                    "federated"
+                    if config_recebida["mode"] in ["FL", "federated"]
+                    else "gossip"
                 )
-                print(f"⚙️️ Chosen mode: {self.mode.upper()}")
+                print(f"⚙ Chosen mode: {self.mode.upper()}")
 
             if "central_ip" in config_recebida:
                 self.server_ip = config_recebida["central_ip"]
@@ -133,26 +136,30 @@ class Model_Manager:
                         f"👷 Sou WORKER (Pipeline). Orquestrador atual: {self.server_ip}"
                     )
 
-            cmd = config_recebida.get("command", "")
-            self.phase = cmd
-            print(f"🔄 FASE ALTERADA PARA: {self.phase}")
-
             if cmd == "TRAIN":
+                print("⏳ A iniciar thread de treino...")
                 threading.Thread(target=self.run_model_training).start()
 
             elif cmd in ["INFERENCE", "METRICS"]:
                 if not self.loaded_model:
-                    self._try_load_existing_model()
-                    if not self.loaded_model:
+                    filename = f"best_RandomForest_{self.broker_id}.pkl"
+                    filepath = os.path.join(self.models_dump_path, filename)
+                    
+                    print(f"🔍 A tentar carregar modelo do disco: {filepath}")
+                    self.loaded_model = self.load_model_pkl(filepath)
+                    
+                    if self.loaded_model:
+                        print("✅ Modelo carregado do disco com sucesso!")
+                    else:
                         print(
-                            "⚠️ AVISO: Modo Inferência ativado mas SEM MODELO treinado."
+                            "⚠️ AVISO: Modo Inferência ativado mas SEM MODELO treinado em memória ou no disco."
                         )
 
             elif cmd == "STOP":
                 print("🛑 Paragem recebida.")
 
         except Exception as e:
-            print(f"Erro ao processar comando: {e}")
+            print(f"❌ Erro ao processar comando: {e}")
 
     def load_model_pkl(self, filepath):
         """
@@ -245,30 +252,34 @@ class Model_Manager:
     def run_model_training(self):
         """
         Executa a pipeline de treino com os melhores parâmetros encontrados.
-        1. Constroi a pipeline.
+1. Constroi a pipeline.
         2. Realiza o hyperparameter tuning usando a grid adaptativa.
         3. Treina o modelo com os melhores parâmetros.
         4. Avalia o modelo nos dados de treino e teste.
         5. Salva o modelo treinado em um ficheiro pickle.
         """
-        df = load_data()
+        df = load_data(self.config["device_id"])
         X_train, X_test, y_train, y_test = data_split(df, self.label_map)
         for name, model_class in MODELS.items():
             pipeline = self.build_pipeline(scaler=StandardScaler(), model=model_class())
             self.best_params, self.best_model = self.param_tuning(
                 pipeline, X_train, y_train
             )
-            # filename = f"best_{name}_{self.broker_id}.pkl"
-            # filepath = self.models_dump_path + filename
-            # pickle.dump(self.best_model, open(filepath, 'wb'))
+            
+            if not os.path.exists(self.models_dump_path):
+                os.makedirs(self.models_dump_path)
+                
+            filename = f"best_{name}_{self.broker_id}.pkl"
+            filepath = os.path.join(self.models_dump_path, filename)
+            pickle.dump(self.best_model, open(filepath, 'wb'))
 
         self.loaded_model = self.best_model
-        print("✅ Modelo treinado com sucesso.")
+        print("✅ Modelo treinado com sucesso e guardado em disco.")
 
     def run_classification(self, data):
         """
         Executa a classificação nos dados de teste e publica as predições.
-        1. Força o cálculo das probabilidades e predições.
+1. Força o cálculo das probabilidades e predições.
         2. Prepara a payload com as predições.
         3. Publica as predições para os destinos definidos.
         """
@@ -307,7 +318,7 @@ class Model_Manager:
     def pipe_worker_on_message(self):
         """
         Worker para processar mensagens de pipeline recebidas via MQTT.
-        1. Espera por mensagens no tópico de treino.
+1. Espera por mensagens no tópico de treino.
         2. Se receber parâmetros agregados, inicia o treino com esses parâmetros.
         3. Gera uma nova grid adaptativa baseada nos parâmetros recebidos.
         4. Executa a pipeline de treino.
