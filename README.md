@@ -12,7 +12,8 @@ P2P_rasps/
 ├── docs/                    ← guias de utilização (ver tabela em baixo)
 ├── inventory.yaml           ← lista de Raspberries (IP, node_id, nome) — fonte única
 ├── inventory.secrets.yaml   ← tokens (local, NÃO vai para o git)
-├── tools/                   ← gen_configs.py + deploy.sh (correm no Mac)
+├── tools/                   ← gen_configs, deploy, sync_clocks, fetch_results (correm no Mac)
+├── analysis/                ← figuras e tabelas do artigo (correm no Mac)
 │
 │   ── Código que vai para os Raspberries (/home/aidi/P2P) ──
 ├── compose.yaml             ← todos os serviços de um nó
@@ -40,6 +41,8 @@ O que vai e o que não vai para os Pis é definido no `.rsyncignore`. Os dados (
 | [docs/deploy.md](docs/deploy.md) | Inventário, gerar configs, enviar código e imagens para os Pis |
 | [docs/control.md](docs/control.md) | UI Streamlit (fases da experiência), Prometheus e Grafana |
 | [docs/rois.md](docs/rois.md) | Selecionar e enviar as ROIs de cada câmara |
+| [docs/analysis.md](docs/analysis.md) | Protocolo experimental (GL vs FL), métricas e figuras do artigo |
+| [docs/cenario.md](docs/cenario.md) | Guião das experiências: calibração das regras, cenários, repetições |
 
 ---
 
@@ -50,7 +53,10 @@ O que vai e o que não vai para os Pis é definido no `.rsyncignore`. Os dados (
 3. **Enviar o código e a config**: UI → tab *Setup & Deploy* → 📤 Atualizar Código (ou `tools/deploy.sh`) → [deploy.md](docs/deploy.md)
 4. **Levantar os serviços nos Pis**: UI → tab *Setup & Deploy* → 🔌 Levantar Serviço
 5. **Definir as ROIs** de cada Pi → [rois.md](docs/rois.md)
-6. Na UI, por ordem: **Data Collection → Treino → Inferência (GL ou FL) → Metrics**
+6. **Sincronizar os relógios**: `python3 tools/sync_clocks.py` → [deploy.md](docs/deploy.md#7-sincronizar-relógios--toolssync_clockspy)
+7. Na UI, por ordem: **Data Collection → Treino → Inferência (GL ou FL) → Metrics**
+8. **Trazer os resultados para o Mac**: `tools/fetch_results.sh <nome_experiência>`
+9. **Figuras e tabelas**: `python3 analysis/make_figures.py experiments/<pasta>` → [analysis.md](docs/analysis.md)
 
 ---
 

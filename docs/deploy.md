@@ -166,6 +166,38 @@ experiments/2026-11-23_1430_gossip_5nos/
 
 ---
 
+## 7. Sincronizar relógios — `tools/sync_clocks.py`
+
+A rede de desenvolvimento não tem internet, por isso os Pis não têm NTP e os relógios
+desviam-se (já se mediram **até 27 dias** de diferença entre nós). Os dados dos vários nós
+são juntados pelo **timestamp real** (tolerância de 500 ms entre nós), por isso os relógios
+têm de estar acertados **antes de cada experiência**.
+
+```bash
+python3 tools/sync_clocks.py --check   # só mede o desfasamento de cada Pi
+python3 tools/sync_clocks.py           # acerta todos os Pis pelo relógio do Mac
+python3 tools/sync_clocks.py rasp3     # só um nó
+```
+
+```
+nó         offset antes  offset depois      rtt
+rasp1        +27.0 dias        +2.1 ms    8.5ms ✅
+```
+
+- ✅ = desfasamento final ≤ 50 ms. Guardar esta tabela: é útil para reportar no artigo.
+- **Método** usado em cada nó:
+  - `sudo`: `sudo -n date -s` (se o utilizador `aidi` tiver sudo sem password).
+  - `docker`: se o sudo pedir password, corre `date -s` num contentor `p2p-rpi` com
+    `--cap-add SYS_TIME` (o `aidi` já está no grupo docker). A correção é relativa e
+    calculada no Pi, por isso o arranque do contentor não afeta a precisão.
+  - Para usar sempre `sudo`, uma vez por Pi (pede a password):
+    `ssh -t aidi@<ip> "echo 'aidi ALL=(root) NOPASSWD: /usr/bin/date' | sudo tee /etc/sudoers.d/gossip-date && sudo chmod 440 /etc/sudoers.d/gossip-date"`
+- Sintoma de relógios dessincronizados no labeler:
+  `⚠️ Merge vazio: nenhuma linha alinhada entre nós`.
+- Os relógios voltam a desviar-se com o tempo (sem NTP): correr antes de cada sessão de testes.
+
+---
+
 ## Primeira instalação de um Pi novo
 
 1. Docker instalado e utilizador `aidi` no grupo `docker`.

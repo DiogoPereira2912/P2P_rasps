@@ -1,0 +1,23 @@
+inicio_s,fim_s,acao,zona,n_camaras,esperado_min_nos_2,instrucao
+0,20,VAZIO,-,0,SAFE,Ninguém no campo de visão
+20,35,PRESENCA,A,2,INTRUSAO,Caminhar normalmente na zona A sem gestos
+35,50,GRUA,A,2,PERIGO_GRUA,De frente para as câmaras: pulsos juntos à frente do peito
+50,60,VAZIO,-,0,SAFE,Sair do campo de visão
+60,75,MAQUINA,B,2,PROXIMIDADE_MAQUINA,Junto à máquina com o braço em interação
+75,85,VAZIO,-,0,SAFE,Sair do campo de visão
+85,100,SOS,B,2,SINAL_SOS,Mão direita junto à cara / acima da cabeça
+100,110,VAZIO,-,0,SAFE,Sair do campo de visão
+110,125,QUEDA,B,2,QUEDA_DETETADA,Deitar no tapete de lado para as câmaras
+125,135,VAZIO,-,0,SAFE,Levantar e sair do campo de visão
+135,150,CORREDOR,C,2,ZONA_FORKLIFT,Entrar e ficar no corredor logístico
+150,160,VAZIO,-,0,SAFE,Sair do campo de visão
+160,175,GRUA,D,1,SAFE,Pulsos juntos à frente do peito na bancada isolada
+175,185,VAZIO,-,0,SAFE,Sair do campo de visão
+185,200,QUEDA,D,1,SAFE,Deitar no tapete na bancada isolada
+200,210,VAZIO,-,0,SAFE,Levantar e sair do campo de visão
+210,225,SOS,E,1,SAFE,Mão junto à cara / acima da cabeça no armazém isolado
+225,235,VAZIO,-,0,SAFE,Sair do campo de visão
+235,250,MAQUINA,E,1,SAFE,Braço em interação no armazém isolado
+250,260,VAZIO,-,0,SAFE,Sair do campo de visão
+260,275,PRESENCA,D,1,SAFE,Caminhar na bancada isolada sem gestos
+275,300,VAZIO,-,0,SAFE,Fim do cenário
