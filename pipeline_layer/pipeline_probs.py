@@ -12,6 +12,7 @@ from yaml import Loader, load
 import json, threading, time, uuid, pickle, os
 from client.mqtt_layer import Communication_Layer
 import pandas as pd
+import numpy as np
 from prometheus_client import start_http_server, Counter
 
 import warnings
@@ -285,7 +286,14 @@ class Model_Manager:
         """
         df = pd.DataFrame(data)
         df = df.drop(columns=["ts"])
-        pred_probs = self.loaded_model.predict_proba(df)
+        # O predict_proba só devolve colunas para as classes que ESTE modelo viu no treino
+        # (model.classes_), e cada nó vê classes diferentes. Para os nós poderem agregar,
+        # expande-se para o vetor global (todas as classes do global_rules.yaml, pela ordem
+        # do label_map), com 0 nas classes que o modelo local não conhece.
+        local_probs = self.loaded_model.predict_proba(df)
+        pred_probs = np.zeros((len(df), len(self.class_list)))
+        for col, class_idx in enumerate(self.loaded_model.classes_):
+            pred_probs[:, int(class_idx)] = local_probs[:, col]
         preds = self.loaded_model.predict(df)
 
         model_preds_payload = {

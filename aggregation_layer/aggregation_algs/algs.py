@@ -147,8 +147,17 @@ def confidence_fallback_aggregation(params_dict, threshold=0.3, fallback_mode="p
     Agrega probabilidades e aplica fallback se a margem de confiança for baixa.
     No modo 'priority', escolhe a opção com MAIOR prioridade (número mais baixo) entre as duas mais votadas.
     """
-    probs_list = list(params_dict.values())
-    
+    # Só a 1ª predição de cada nó entra na decisão (flat_probs = avg_probs[0]).
+    # Cortar já aqui evita o erro "inhomogeneous shape" quando os nós enviam batches
+    # com nº de linhas diferente.
+    probs_list = [np.asarray(p, dtype=float)[:1] for p in params_dict.values()]
+
+    num_classes = {p.shape[1] for p in probs_list}
+    if len(num_classes) > 1:
+        raise ValueError(
+            f"Nós com nº de classes diferente {num_classes}: confirmar que todos usam o mesmo global_rules.yaml"
+        )
+
     avg_probs = np.mean(probs_list, axis=0)
     flat_probs = avg_probs[0] 
     

@@ -143,6 +143,29 @@ ls data_exports/ models/               # dados e modelos guardados no nó
 
 ---
 
+## 6. Trazer resultados para o Mac — `tools/fetch_results.sh`
+
+```bash
+tools/fetch_results.sh gossip_5nos              # todos os nós
+tools/fetch_results.sh fl_central_rasp1 rasp1   # só alguns
+```
+
+Copia `data_exports/` e `results/` de cada Pi para:
+
+```
+experiments/2026-11-23_1430_gossip_5nos/
+├── metadata.yaml      ← commit do git, se havia alterações por commitar, data
+├── inventory.yaml     ← cópia do inventário usado
+├── rasp1/data_exports/  rasp1/results/
+└── ...
+```
+
+- Nunca apaga nada nos Pis (sem `--delete`).
+- `experiments/` não vai para o git nem para os Pis.
+- Usar um nome por experiência (ex: `gl_5nos_rep1`, `fl_5nos_rep1`) para depois comparar.
+
+---
+
 ## Primeira instalação de um Pi novo
 
 1. Docker instalado e utilizador `aidi` no grupo `docker`.

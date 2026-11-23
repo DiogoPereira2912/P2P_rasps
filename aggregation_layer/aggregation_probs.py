@@ -253,13 +253,20 @@ class Aggregator:
                 self.remote_preds = {k: v['preds'] for k, v in current_round_buffer.items()}
                 self.pred_probs_dict = {k: v['pred_probs'] for k, v in current_round_buffer.items()}
                 #final_probs = self.aggregate(self.pred_probs_dict, method="avg")
-                final_probs = self.aggregate(
-                    self.pred_probs_dict, 
-                    method="fallback",
-                    threshold=0.3,              
-                    fallback_mode="priority", 
-                    priority_map=self.priority_map
-                )
+                # Um erro numa ronda não pode matar o worker (thread) — regista e segue
+                try:
+                    final_probs = self.aggregate(
+                        self.pred_probs_dict,
+                        method="fallback",
+                        threshold=0.3,
+                        fallback_mode="priority",
+                        priority_map=self.priority_map
+                    )
+                except Exception as e:
+                    print(f"❌ [AGG] Erro na agregação, ronda ignorada: {e}")
+                    self.remote_preds = {}
+                    self.pred_probs_dict = {}
+                    continue
 
                 # final_probs pode ser lista (avg) ou np.ndarray (fallback) -> não usar "if final_probs"
                 final_prob_idx = (
@@ -279,17 +286,26 @@ class Aggregator:
                         if isinstance(raw_data, dict):
                             raw_data = [raw_data] 
                         full_test_df = pd.DataFrame(raw_data)
-                        
-                        full_test_df["local_probs"] = [my_data['pred_probs']]
+                        n_rows = len(full_test_df)
+
+                        # Uma linha por amostra do batch:
+                        #   local_probs  -> vetor de probabilidades do modelo local dessa linha
+                        #   global_probs -> decisão agregada da ronda (igual para todas as linhas)
+                        # Tudo convertido para listas de float simples: o pyarrow/deltalake
+                        # não aceita np.ndarray 2D dentro de uma coluna.
+                        global_vector = [float(p) for p in np.asarray(final_probs)[0]]
+                        full_test_df["local_probs"] = [[float(p) for p in row] for row in my_data['pred_probs']]
                         full_test_df['local_pred'] = [self.reverse_label_map.get(x, "UNKNOWN") for x in my_data['preds']]
-                        full_test_df['global_probs'] = [final_probs]
+                        full_test_df['global_probs'] = [global_vector] * n_rows
                         full_test_df['global_pred'] = final_label
 
-                        if not os.path.exists(self.test_data_path):
-                            os.makedirs(self.test_data_path)
-                            
-                        write_deltalake(self.test_data_path, full_test_df, mode="append")
-                        print(f"✅ [SUCESSO] Dados gravados em {self.test_data_path}")
+                        try:
+                            if not os.path.exists(self.test_data_path):
+                                os.makedirs(self.test_data_path)
+                            write_deltalake(self.test_data_path, full_test_df, mode="append")
+                            print(f"✅ [SUCESSO] {n_rows} linhas gravadas em {self.test_data_path}")
+                        except Exception as e:
+                            print(f"❌ [IO] Erro ao gravar em {self.test_data_path}: {e}")
 
                 # only central server publishes the aggregated prediction to the workers in federated mode
                 if self.mode == "federated" and self.peer_ip != self.server_ip:

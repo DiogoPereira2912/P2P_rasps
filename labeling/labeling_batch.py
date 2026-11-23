@@ -316,13 +316,18 @@ class Labeller:
                     "labelled_df": self.local_groundtruth_history,
                 }
 
-                target_topic = f"{self.broker_id}/dataset"
+                # Envia para o tópico <peer>/dataset de cada peer (igual à fase COLLECTION).
+                # Publicar no próprio tópico (<eu>/dataset) não chega aos outros nós: a bridge
+                # reencaminha-o com prefixo (br_XXX/...), que não bate com o subscribe "+/dataset".
+                if hasattr(self, "peer_ips"):
+                    for ip in self.peer_ips:
+                        target_id = ip.replace(".", "_")
+                        self.mqtt_com.publish(payload, f"{target_id}/dataset")
+                        print(
+                            f"🚀 PACOTE EXTERNO ENVIADO -> Tópico: {target_id}/dataset"
+                        )
 
-                self.mqtt_com.publish(payload, target_topic)
-                print(
-                    "🚀 PACOTE ENVIADO À espera dos dados para Merge Final... para",
-                    target_topic,
-                )
+                print("📦 À espera dos dados dos outros nós para o Merge Final...")
                 self.mqtt_com.msg_queue.put((f"{self.broker_id}/dataset", payload))
 
     def label_worker_on_message(self):

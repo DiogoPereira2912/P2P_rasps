@@ -9,3 +9,4 @@ models/
 control/imgs/
 build/
 inventory.secrets.yaml
+experiments/

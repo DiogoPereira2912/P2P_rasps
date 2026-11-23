@@ -15,7 +15,10 @@ remote_path: /home/aidi/P2P
 defaults:
   mosquitto_port: 1884
   broadcast_port: 50001
-  broadcast_mask: "255.255.255.255"
+  # Broadcast da sub-rede (ver "broadcast" no ifconfig dos Pis). Não usar 255.255.255.255:
+  # numa rede sem gateway/internet não há rota por defeito e o envio dá
+  # "OSError: [Errno 101] Network is unreachable" no peer.py.
+  broadcast_mask: "192.168.0.255"
   mode: gossip            # gossip | federated
   central_id: 0           # node_id do servidor central no modo federated
   min_peers: 2

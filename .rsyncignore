@@ -16,3 +16,4 @@ tools/
 inventory.yaml
 inventory.secrets.yaml
 docs/
+experiments/
