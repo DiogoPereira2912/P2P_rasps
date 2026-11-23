@@ -1,5 +1,6 @@
 from collections import Counter
 import numpy as np
+from labeling.labeling_utils import status_from_votes  # mesmo critério do ground truth
 
 # def aggregate_avg(params_dict):
 #     """
@@ -193,7 +194,38 @@ def confidence_fallback_aggregation(params_dict, threshold=0.3, fallback_mode="p
         
         return avg_probs
 
+def rules_aggregation(params_dict, rules_config=None, label_map=None, verbose=True, **kwargs):
+    """
+    Consenso com o MESMO critério do ground truth (global_rules.yaml):
+      1. um nó "vê" a classe c se a sua probabilidade em c >= prob_threshold
+      2. a regra dispara se >= min_nos nós a virem
+      3. entre as regras disparadas vence a de maior prioridade; nenhuma -> SAFE
+    Usa a 1ª predição de cada nó (igual aos outros métodos).
+    Nota: se houver menos nós na ronda do que o min_nos de uma regra, ela não pode disparar.
+
+    Returns:
+        vetor one-hot (1, n_classes) com a classe decidida
+    """
+    probs = np.array([np.asarray(p, dtype=float)[0] for p in params_dict.values()])
+    threshold = rules_config.get("prob_threshold", 0.5)
+
+    votes = {
+        label: int((probs[:, idx] >= threshold).sum())
+        for label, idx in label_map.items()
+        if label != "SAFE"
+    }
+    decision = status_from_votes(votes, rules_config)
+    fired = {k: v for k, v in votes.items() if v > 0}
+    if verbose:
+        print(f"🗳️  Votos por classe ({len(params_dict)} nós): {fired or 'nenhum'} -> {decision}")
+
+    result = np.zeros((1, probs.shape[1]))
+    result[0, label_map[decision]] = 1.0
+    return result
+
+
 ALGS_DICT = {
     "avg": aggregate_avg,
     "fallback": confidence_fallback_aggregation,
+    "rules": rules_aggregation,
 }

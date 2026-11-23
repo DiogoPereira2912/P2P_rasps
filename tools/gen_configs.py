@@ -82,14 +82,13 @@ def build_node_config(name, node, defaults, all_ids):
     return cfg
 
 
-def build_global_rules(device_id):
-    """Copia o template e troca a chave do rasp nas condições pelo device_id do nó."""
+def build_global_rules():
+    """
+    As regras globais descrevem o shop floor (todas as câmaras), por isso são iguais
+    em todos os nós: copia o template tal como está.
+    """
     with open(GLOBAL_RULES_TEMPLATE) as f:
-        rules = yaml.safe_load(f)
-    for rule in rules.get("regras", []):
-        cond = rule.get("condicoes", {})
-        rule["condicoes"] = {device_id: v for v in cond.values()} if cond else {}
-    return rules
+        return yaml.safe_load(f)
 
 
 def write_yaml(path, data):
@@ -99,13 +98,27 @@ def write_yaml(path, data):
         yaml.safe_dump(data, f, sort_keys=False, allow_unicode=True)
 
 
-def build_prometheus(ips):
+def build_prometheus(nodes):
+    """
+    Um alvo por nó e por serviço, com a etiqueta node=<nome> (rasp1, ...), para as
+    dashboards do Grafana mostrarem nomes em vez de IPs.
+    """
+    def job(name, port):
+        return {
+            "job_name": name,
+            "static_configs": [
+                {"targets": [f"{n['ip']}:{port}"], "labels": {"node": node_name}}
+                for node_name, n in nodes.items()
+            ],
+        }
+
     return {
         "global": {"scrape_interval": "2s", "evaluation_interval": "2s"},
         "scrape_configs": [
             {"job_name": "prometheus", "static_configs": [{"targets": ["localhost:9090"]}]},
-            {"job_name": "hardware_cadvisor", "static_configs": [{"targets": [f"{ip}:8080" for ip in ips]}]},
-            {"job_name": "throughput_python", "static_configs": [{"targets": [f"{ip}:8000" for ip in ips]}]},
+            job("hardware_cadvisor", 8080),   # CPU/RAM/rede por contentor
+            job("throughput_python", 8000),   # pipeline: frames inferidos
+            job("aggregation", 8002),         # consenso: decisões, divergência, latência
         ],
     }
 
@@ -125,14 +138,14 @@ def main():
         node_dir = BUILD / "nodes" / name
         write_yaml(node_dir / "client" / "config.yaml",
                    build_node_config(name, node, inv["defaults"], all_ids))
-        write_yaml(node_dir / "labeling" / "global_rules.yaml", build_global_rules(name))
+        write_yaml(node_dir / "labeling" / "global_rules.yaml", build_global_rules())
         print(f"✅ {name:8s} {node['ip']:15s} node_id={node['node_id']}")
 
     with open(BUILD / "nodes.txt", "w") as f:
         for name, node in nodes.items():
             f.write(f"{name} {node['ip']} {inv['ssh_user']} {inv['remote_path']}\n")
 
-    write_yaml(PROMETHEUS, build_prometheus(ips))
+    write_yaml(PROMETHEUS, build_prometheus(nodes))
     print(f"✅ {PROMETHEUS.relative_to(ROOT)} atualizado")
 
     print(f"\n📁 Ficheiros gerados em {BUILD.relative_to(ROOT)}/")

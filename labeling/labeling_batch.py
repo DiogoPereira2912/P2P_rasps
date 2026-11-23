@@ -10,6 +10,7 @@ from labeling_utils import (
     merge_labelled_dfs,
     process_labelled_df,
     load_class_mappings,
+    status_from_votes,
 )
 from metrics import MetricsAnalyzer
 
@@ -161,30 +162,18 @@ class Labeller:
             result[nome] = 1 if self.check_rule(row, regra["condicoes"]) == 1 else 0
         return result
 
-    def get_global_status(self, row, rules_config, device_ids: list):
-        current_status = "SAFE"
-        min_priority = 999
+    def get_global_status(self, row, rules_config, device_ids: list, min_nos_override=None):
+        """
+        Estado de uma linha a partir das colunas 0/1 <label>_<nó> dos nós em device_ids.
+          - Ground truth do shop floor: device_ids = todos os nós (linha já com o merge)
+          - Label LOCAL de treino: device_ids = [este nó], min_nos_override = 1
+        O critério (min_nos + prioridade) está em labeling_utils.status_from_votes.
+        """
+        votes = {}
         for rule in rules_config.get("regras", []):
-            label_target = rule["label"]
-            condicoes = rule["condicoes"]
-            prioridade = rule["prioridade"]
-            rule_match = True
-            for id in condicoes:
-                if id not in device_ids:
-                    rule_match = False
-                    continue
-                else:
-                    req_r1 = condicoes.get(id)
-                    val_r1 = row.get(f"{label_target}_{id}", 0)
-                    match_r1 = (val_r1 == req_r1) if req_r1 is not None else True
-                if not match_r1:
-                    rule_match = False
-                    break
-            if rule_match:
-                if prioridade < min_priority:
-                    min_priority = prioridade
-                    current_status = rule["label"]
-        return current_status
+            label = rule["label"]
+            votes[label] = sum(1 for d in device_ids if row.get(f"{label}_{d}", 0) == 1)
+        return status_from_votes(votes, rules_config, min_nos_override)
 
     def process_batch(self, data):
 
@@ -260,10 +249,12 @@ class Labeller:
 
                 self.mqtt_com.msg_queue.put((f"{self.broker_id}/dataset", payload))
 
+                # Label LOCAL de treino: o que ESTA câmara vê (só as suas colunas,
+                # basta este nó -> min_nos = 1). O consenso entre nós é que junta as peças.
                 df_final_local = pd.DataFrame(self.local_full_history)
                 df_final_local["GLOBAL_STATUS"] = df_final_local.apply(
                     lambda row: self.get_global_status(
-                        row, self.global_rules, search_ids
+                        row, self.global_rules, [self.device_id], min_nos_override=1
                     ),
                     axis=1,
                 )
@@ -391,20 +382,13 @@ class Labeller:
 
                     if self.is_finished and self.phase == "COLLECTION":
 
+                        # Timestamps REAIS: os nós são alinhados pelo instante da deteção
+                        # (merge_asof com tolerância). Requer relógios sincronizados
+                        # (tools/sync_clocks.py) antes da experiência.
                         my_df = pd.DataFrame(self.local_full_history)
-                        if "ts" in my_df.columns:
-                            # SINCRONIZAÇÃO POR ORDEM: Ignora relógios desfasados de hardware
-                            my_df["ts"] = pd.date_range(
-                                start="2024-01-01", periods=len(my_df), freq="ms"
-                            )
-
                         dfs_to_merge = [process_labelled_df(my_df)]
                         for pid, pdf in self.peer_history.items():
                             if not pdf.empty:
-                                if "ts" in pdf.columns:
-                                    pdf["ts"] = pd.date_range(
-                                        start="2024-01-01", periods=len(pdf), freq="ms"
-                                    )
                                 dfs_to_merge.append(process_labelled_df(pdf))
 
                         # GATILHO PREMATURO: Espera obrigatoriamente por todos os nós
@@ -416,6 +400,13 @@ class Labeller:
                         if len(dfs_to_merge) >= expected_nodes:
                             print("A GERAR DATASET MERGED FINAL")
                             df_final = merge_labelled_dfs(dfs_to_merge)
+                            if df_final.empty:
+                                print(
+                                    "⚠️ Merge vazio: nenhuma linha alinhada entre nós. "
+                                    "Relógios dessincronizados? Correr tools/sync_clocks.py"
+                                )
+                                self.mqtt_com.msg_queue.task_done()
+                                continue
                             df_final["GLOBAL_STATUS"] = df_final.apply(
                                 lambda row: self.get_global_status(
                                     row, self.global_rules, search_ids
@@ -443,20 +434,14 @@ class Labeller:
 
                     elif self.is_finished and self.phase == "INFERENCE":
 
+                        # Timestamps REAIS (ver fase COLLECTION). O ts de cada linha do
+                        # ground truth é igual ao ts da linha correspondente em
+                        # local_inf_data_<nó> (mesma origem: este labeler), o que permite
+                        # ao metrics.py juntar predição <-> GT sem ambiguidade.
                         my_df = pd.DataFrame(self.local_groundtruth_history)
-                        if "ts" in my_df.columns:
-                            # SINCRONIZAÇÃO POR ORDEM: Ignora relógios desfasados de hardware
-                            my_df["ts"] = pd.date_range(
-                                start="2024-01-01", periods=len(my_df), freq="ms"
-                            )
-
                         dfs_to_merge = [process_labelled_df(my_df)]
                         for pid, pdf in self.peer_history.items():
                             if not pdf.empty:
-                                if "ts" in pdf.columns:
-                                    pdf["ts"] = pd.date_range(
-                                        start="2024-01-01", periods=len(pdf), freq="ms"
-                                    )
                                 dfs_to_merge.append(process_labelled_df(pdf))
 
                         # GATILHO PREMATURO: Espera obrigatoriamente por todos os nós
@@ -468,6 +453,13 @@ class Labeller:
                         if len(dfs_to_merge) >= expected_nodes:
                             print("A GERAR DATASET MERGED FINAL")
                             df_final = merge_labelled_dfs(dfs_to_merge)
+                            if df_final.empty:
+                                print(
+                                    "⚠️ Merge vazio: nenhuma linha alinhada entre nós. "
+                                    "Relógios dessincronizados? Correr tools/sync_clocks.py"
+                                )
+                                self.mqtt_com.msg_queue.task_done()
+                                continue
                             df_final["GLOBAL_STATUS"] = df_final.apply(
                                 lambda row: self.get_global_status(
                                     row, self.global_rules, search_ids

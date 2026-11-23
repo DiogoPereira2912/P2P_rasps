@@ -22,6 +22,9 @@ defaults:
   mode: gossip            # gossip | federated
   central_id: 0           # node_id do servidor central no modo federated
   min_peers: 2
+  # Consenso no aggregation: rules (mesmo critério do ground truth, global_rules.yaml)
+  # | avg (média, baseline) | fallback (média + prioridade quando a margem é baixa)
+  aggregation_method: rules
   video_path:
     - /dev/video0
   resolution:

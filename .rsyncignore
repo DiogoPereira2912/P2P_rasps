@@ -17,3 +17,4 @@ inventory.yaml
 inventory.secrets.yaml
 docs/
 experiments/
+analysis/

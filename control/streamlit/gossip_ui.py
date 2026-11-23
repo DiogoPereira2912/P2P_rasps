@@ -368,6 +368,14 @@ with tab4:
             "🔄 Em Gossip, todos os nós comunicam entre si P2P. Não há servidor central."
         )
 
+    # Etiqueta da experiência: vai em todas as linhas gravadas (run_id) para separar
+    # GL vs FL, repetições, cenários... nos gráficos (analysis/).
+    experiment_tag = st.text_input(
+        "🏷️ Etiqueta da experiência (opcional)",
+        placeholder="ex: cenario_A_rep1",
+        help="O run_id final fica <data_hora>_<GL|FL>_<etiqueta>.",
+    )
+
     col_start, col_stop = st.columns(2)
 
     with col_start:
@@ -380,8 +388,16 @@ with tab4:
 
             modo_selecionado = "FL" if "Federated" in test_mode else "GL"
 
+            run_id = f"{time.strftime('%Y%m%d_%H%M%S')}_{modo_selecionado}"
+            if experiment_tag.strip():
+                run_id += f"_{experiment_tag.strip().replace(' ', '_')}"
+
             config_payload = {
-                "config": {"mode": modo_selecionado, "max_saves": max_inferences}
+                "config": {
+                    "mode": modo_selecionado,
+                    "max_saves": max_inferences,
+                    "run_id": run_id,
+                }
             }
 
             if central_ip_selecionado:
@@ -397,6 +413,7 @@ with tab4:
                     else:
                         st.write(f"**{ip}**: {status}")
 
+            st.success(f"🏷️ run_id: `{run_id}`")
             st.toast("Modo INFERENCE Ativado!")
 
     with col_stop:

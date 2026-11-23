@@ -1,0 +1,12 @@
+# Datasource criada automaticamente pelo Grafana no arranque (provisioning).
+# O uid fixo "prometheus" é o que as dashboards em ../dashboards/ referenciam.
+apiVersion: 1
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    jsonData:
+      timeInterval: 2s   # = scrape_interval do prometheus.yaml

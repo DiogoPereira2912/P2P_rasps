@@ -7,11 +7,13 @@ import pandas as pd
 import numpy as np
 from deltalake.writer import write_deltalake
 from aggregation_algs.aggregation_utils import resolve_targets_by_index, load_class_mappings
+from prometheus_client import start_http_server, Counter, Gauge, Histogram
 
 import warnings 
 warnings.filterwarnings("ignore")
 
 WINDOW_DURATION = 5.0 # Duração da janela de agregação em segundos
+PROMETHEUS_PORT = 8002  # 8000 = pipeline, 8001 = video server, 8080 = cAdvisor
 
 class Aggregator:
  
@@ -61,6 +63,16 @@ class Aggregator:
                 self.priority_map[idx] = prio
 
         self.test_data_path = f"data_exports/local_inf_data_{self.config['device_id']}"
+        self.device_id = self.config["device_id"]
+
+        # Método de consenso: "rules" (mesmo critério do ground truth, global_rules.yaml)
+        # ou "avg"/"fallback" (baselines). Cada linha gravada guarda o método usado.
+        self.agg_method = self.config.get("aggregation_method", "rules")
+        # Identificador da experiência (enviado pela UI no comando INFERENCE)
+        self.run_id = None
+        print(f"⚙️ Método de agregação: {self.agg_method}")
+
+        self._setup_prometheus_metrics()
 
         # if self.mode == "federated":
         #     if self.node_id == self.central_id:
@@ -118,10 +130,94 @@ class Aggregator:
                 else:
                     print(f"👷 Sou WORKER (Agregador). O orquestrador é o {self.server_ip}")
 
+            if cmd == "INFERENCE":
+                self.run_id = config_recebida.get("run_id") or time.strftime("%Y%m%d_%H%M%S")
+                print(f"🏷️  Run: {self.run_id}")
+
             self.phase = cmd
 
         except Exception as e:
             print(f"Erro no controlo Aggregator: {e}")
+
+    def _setup_prometheus_metrics(self):
+        """
+        Métricas para o Grafana (dashboard "Classificação & Consenso").
+        A latência entre nós só é válida com relógios sincronizados (tools/sync_clocks.py).
+        """
+        labels = ["node", "mode", "method"]
+        self.m_rounds = Counter("aidi_agg_rounds_total", "Rondas de consenso", labels)
+        self.m_decisions = Counter("aidi_agg_decisions_total", "Decisões globais por classe", labels + ["decision"])
+        self.m_divergence = Counter("aidi_agg_divergence_total", "Rondas em que a decisão global difere da local", labels)
+        self.m_nodes = Gauge("aidi_agg_nodes_in_round", "Nº de nós na última ronda", ["node"])
+        self.m_msg_delay = Histogram(
+            "aidi_agg_message_delay_seconds", "Predição publicada -> recebida no agregador",
+            ["node", "mode"], buckets=(0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5),
+        )
+        self.m_decision_delay = Histogram(
+            "aidi_agg_decision_delay_seconds", "Predição publicada -> decisão global (inclui a janela)",
+            ["node", "mode"], buckets=(0.5, 1, 2, 3, 4, 5, 6, 8, 10, 15),
+        )
+        try:
+            start_http_server(PROMETHEUS_PORT)
+            print(f"📡 Prometheus exporter (aggregation) na porta {PROMETHEUS_PORT}")
+        except Exception as e:
+            print(f"⚠ Aviso: Prometheus exporter não arrancou: {e}")
+
+    def _run_aggregation(self, probs_dict):
+        """Aplica o método configurado, com os parâmetros que cada um precisa."""
+        if self.agg_method == "rules":
+            return self.aggregate(probs_dict, method="rules",
+                                  rules_config=self.global_rules, label_map=self.label_map)
+        if self.agg_method == "fallback":
+            return self.aggregate(probs_dict, method="fallback", threshold=0.3,
+                                  fallback_mode="priority", priority_map=self.priority_map)
+        return self.aggregate(probs_dict, method=self.agg_method)
+
+    def _save_round(self, buffer, node_ids, final_label, final_probs, decision_ts):
+        """
+        Grava em local_inf_data_<nó> uma linha por amostra dos nós em node_ids, com tudo
+        o que é preciso para a análise offline (analysis/):
+          - device/node_id: nó que fez a predição local
+          - mode, agg_method, run_id: para separar GL vs FL e métodos nos gráficos
+          - pred_ts, decision_ts: latência predição -> decisão
+          - round_probs: probabilidades de TODOS os nós da ronda (permite recalcular
+            offline qualquer método de consenso sobre exatamente os mesmos dados)
+        """
+        global_vector = [float(p) for p in np.asarray(final_probs)[0]]
+        round_probs = json.dumps({str(k): [float(p) for p in v['pred_probs'][0]] for k, v in buffer.items()})
+        frames = []
+        for nid in node_ids:
+            entry = buffer[nid]
+            raw_data = entry['data']
+            if isinstance(raw_data, dict):
+                raw_data = [raw_data]
+            df = pd.DataFrame(raw_data)
+            n_rows = len(df)
+            df["device"] = entry.get("device") or str(nid)
+            df["node_id"] = nid
+            df["local_probs"] = [[float(p) for p in row] for row in entry['pred_probs']]
+            df["local_pred"] = [self.reverse_label_map.get(x, "UNKNOWN") for x in entry['preds']]
+            df["global_probs"] = [global_vector] * n_rows
+            df["global_pred"] = final_label
+            df["mode"] = self.mode
+            df["agg_method"] = self.agg_method
+            df["run_id"] = self.run_id or "sem_run_id"
+            df["saved_by"] = self.device_id
+            df["pred_ts"] = float(entry['ts'])
+            df["decision_ts"] = decision_ts
+            df["n_nodes"] = len(buffer)
+            df["round_probs"] = round_probs
+            frames.append(df)
+        if not frames:
+            return
+        full_df = pd.concat(frames, ignore_index=True)
+        try:
+            if not os.path.exists(self.test_data_path):
+                os.makedirs(self.test_data_path)
+            write_deltalake(self.test_data_path, full_df, mode="append", schema_mode="merge")
+            print(f"✅ [SUCESSO] {len(full_df)} linhas gravadas em {self.test_data_path}")
+        except Exception as e:
+            print(f"❌ [IO] Erro ao gravar em {self.test_data_path}: {e}")
 
     def _verify_central_server(self, peers_list):
         """
@@ -180,12 +276,12 @@ class Aggregator:
         pred_probs = data["pred_probs"]
         preds = data["preds"]
 
-        if node_id in buffer:
-            existing_ts = buffer[node_id]["ts"]
-            if msg_ts > existing_ts:
-                buffer[node_id] = {'ts': msg_ts,'data': test_data, 'pred_probs': pred_probs, 'preds': preds}
-        else:
-            buffer[node_id] = {'ts': msg_ts, 'data': test_data, 'pred_probs': pred_probs, 'preds': preds}
+        device = data.get("device", str(node_id))
+        self.m_msg_delay.labels(node=device, mode=self.mode).observe(max(0.0, time.time() - msg_ts))
+
+        entry = {'ts': msg_ts, 'data': test_data, 'pred_probs': pred_probs, 'preds': preds, 'device': device}
+        if node_id not in buffer or msg_ts > buffer[node_id]["ts"]:
+            buffer[node_id] = entry
 
     def agg_worker(self):
         '''
@@ -248,93 +344,72 @@ class Aggregator:
                     continue
             print(f"🔒 [AGG] Janela fechada. Total de nós recolhidos: {len(current_round_buffer)}")
 
-            if len(current_round_buffer) > 0:
-
-                self.remote_preds = {k: v['preds'] for k, v in current_round_buffer.items()}
-                self.pred_probs_dict = {k: v['pred_probs'] for k, v in current_round_buffer.items()}
-                #final_probs = self.aggregate(self.pred_probs_dict, method="avg")
-                # Um erro numa ronda não pode matar o worker (thread) — regista e segue
-                try:
-                    final_probs = self.aggregate(
-                        self.pred_probs_dict,
-                        method="fallback",
-                        threshold=0.3,
-                        fallback_mode="priority",
-                        priority_map=self.priority_map
-                    )
-                except Exception as e:
-                    print(f"❌ [AGG] Erro na agregação, ronda ignorada: {e}")
-                    self.remote_preds = {}
-                    self.pred_probs_dict = {}
-                    continue
-
-                # final_probs pode ser lista (avg) ou np.ndarray (fallback) -> não usar "if final_probs"
-                final_prob_idx = (
-                    int(np.argmax(final_probs[0]))
-                    if final_probs is not None and len(final_probs) > 0
-                    else None
-                )
-                final_label = self.reverse_label_map.get(final_prob_idx, "UNKNOWN")
-
-                if self.phase in ["INFERENCE", "METRICS"]:
-                    print(f"💾 [IO] A tentar gravar. Procuro pelo ID: {self.node_id}")
-                    if self.node_id in current_round_buffer:
-
-                        my_data = current_round_buffer[self.node_id]
-
-                        raw_data = my_data['data']
-                        if isinstance(raw_data, dict):
-                            raw_data = [raw_data] 
-                        full_test_df = pd.DataFrame(raw_data)
-                        n_rows = len(full_test_df)
-
-                        # Uma linha por amostra do batch:
-                        #   local_probs  -> vetor de probabilidades do modelo local dessa linha
-                        #   global_probs -> decisão agregada da ronda (igual para todas as linhas)
-                        # Tudo convertido para listas de float simples: o pyarrow/deltalake
-                        # não aceita np.ndarray 2D dentro de uma coluna.
-                        global_vector = [float(p) for p in np.asarray(final_probs)[0]]
-                        full_test_df["local_probs"] = [[float(p) for p in row] for row in my_data['pred_probs']]
-                        full_test_df['local_pred'] = [self.reverse_label_map.get(x, "UNKNOWN") for x in my_data['preds']]
-                        full_test_df['global_probs'] = [global_vector] * n_rows
-                        full_test_df['global_pred'] = final_label
-
-                        try:
-                            if not os.path.exists(self.test_data_path):
-                                os.makedirs(self.test_data_path)
-                            write_deltalake(self.test_data_path, full_test_df, mode="append")
-                            print(f"✅ [SUCESSO] {n_rows} linhas gravadas em {self.test_data_path}")
-                        except Exception as e:
-                            print(f"❌ [IO] Erro ao gravar em {self.test_data_path}: {e}")
-
-                # only central server publishes the aggregated prediction to the workers in federated mode
-                if self.mode == "federated" and self.peer_ip != self.server_ip:
-                    self.remote_preds = {}
-                    self.pred_probs_dict = {}
-                    continue 
-
-                payload = {
-                    "id": self.broker_id,
-                    "ts": time.time(),
-                    "final_pred": final_label, 
-                }
-                print(f"Final aggregated prediction: {final_label} with probs {final_probs}")
-                if self.mode == "federated":
-                    self.mqtt_com.publish(payload, topic=f"{self.broker_id}/train")
-                    print("Publicar em", f"{self.broker_id}/train")
-                else:
-                    targets = resolve_targets_by_index(self.current_peer_list, self.aggregation_dest_indices)
-                    if not targets:
-                        self.mqtt_com.publish(payload, topic=f"{self.broker_id}/train")
-                    else:
-                        for ip in targets:
-                            target_id = ip.replace(".", "_")
-                            self.mqtt_com.publish(payload, topic=f"{target_id}/train")
-                self.remote_preds = {}
-                self.pred_probs_dict = {}
-            else:
+            if len(current_round_buffer) == 0:
                 print("⚠️ [AGG] Janela fechou sem dados válidos.")
                 continue
+
+            # FL: só o servidor central agrega. Os workers também recebem a sua própria
+            # predição (o broker local entrega-a), mas não decidem nada.
+            is_central = self.peer_ip == self.server_ip
+            if self.mode == "federated" and not is_central:
+                print("👷 [AGG] FL: sou worker, a decisão é do servidor central.")
+                continue
+
+            self.pred_probs_dict = {k: v['pred_probs'] for k, v in current_round_buffer.items()}
+            # Um erro numa ronda não pode matar o worker (thread) — regista e segue
+            try:
+                final_probs = self._run_aggregation(self.pred_probs_dict)
+            except Exception as e:
+                print(f"❌ [AGG] Erro na agregação, ronda ignorada: {e}")
+                self.pred_probs_dict = {}
+                continue
+            decision_ts = time.time()
+
+            # final_probs pode ser lista (avg) ou np.ndarray -> não usar "if final_probs"
+            final_prob_idx = (
+                int(np.argmax(final_probs[0]))
+                if final_probs is not None and len(final_probs) > 0
+                else None
+            )
+            final_label = self.reverse_label_map.get(final_prob_idx, "UNKNOWN")
+            print(f"🌐 [AGG] Decisão global ({self.mode}, {self.agg_method}): {final_label}")
+
+            # --- Métricas Prometheus ---
+            m_labels = dict(node=self.device_id, mode=self.mode, method=self.agg_method)
+            self.m_rounds.labels(**m_labels).inc()
+            self.m_decisions.labels(**m_labels, decision=final_label).inc()
+            self.m_nodes.labels(node=self.device_id).set(len(current_round_buffer))
+            if self.node_id in current_round_buffer:
+                own = current_round_buffer[self.node_id]
+                if self.reverse_label_map.get(own['preds'][0]) != final_label:
+                    self.m_divergence.labels(**m_labels).inc()
+            for entry in current_round_buffer.values():
+                self.m_decision_delay.labels(node=entry['device'], mode=self.mode).observe(
+                    max(0.0, decision_ts - entry['ts'])
+                )
+
+            # --- Gravação para a análise offline ---
+            # GL: cada nó grava a SUA linha. FL: o central grava as de todos os nós.
+            if self.phase in ["INFERENCE", "METRICS"]:
+                if self.mode == "federated":
+                    nodes_to_save = list(current_round_buffer.keys())
+                else:
+                    nodes_to_save = [self.node_id] if self.node_id in current_round_buffer else []
+                self._save_round(current_round_buffer, nodes_to_save, final_label, final_probs, decision_ts)
+
+            # --- Envio da decisão global ---
+            payload = {
+                "id": self.broker_id,
+                "ts": decision_ts,
+                "final_pred": final_label,
+            }
+            if self.mode == "federated":
+                targets = [p[0] for p in self.current_peer_list]  # central -> todos os workers
+            else:
+                targets = resolve_targets_by_index(self.current_peer_list, self.aggregation_dest_indices)
+            for ip in targets:
+                self.mqtt_com.publish(payload, topic=f"{ip.replace('.', '_')}/train")
+            self.pred_probs_dict = {}
 
 if __name__ == "__main__":
     aggregator = Aggregator()

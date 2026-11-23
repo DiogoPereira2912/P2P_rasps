@@ -1,0 +1,13 @@
+# Carrega as dashboards JSON de control/grafana/dashboards/ (pasta "Gossip" no Grafana).
+# Ficam no git: sobrevivem a resets do Grafana, mudanças de password e de volumes.
+# Alterações feitas na UI do Grafana NÃO são guardadas nos ficheiros: para manter,
+# exportar a dashboard (Share -> Export -> Save to file) e substituir o JSON aqui.
+apiVersion: 1
+providers:
+  - name: gossip
+    folder: Gossip
+    type: file
+    allowUiUpdates: true
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/dashboards

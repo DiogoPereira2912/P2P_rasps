@@ -12,26 +12,43 @@ GLOBAL_RULES_PATH = "labeling/global_rules.yaml"
 sns.set_theme(style="whitegrid")
 plt.rcParams.update({"font.size": 12})
 
-def load_inference_data(path, label_map=None):
-    """Carrega os dados gravados pelo Agregador."""
-    try:
-        if path == "data_exports/local_inf_data_rasp1/":
-            dt = DeltaTable(path)
-            df = dt.to_pandas()
-            df["ts"] = pd.to_datetime(df["ts"]).astype("datetime64[ns]")
-            df = df.sort_values("ts")
-            df["local_pred"] = df["local_pred"].map(label_map)
-            return df
-        else:
-            dt = DeltaTable(path)
-            df = dt.to_pandas()
-            df["ts"] = pd.to_datetime(df["ts"]).astype("datetime64[ns]")
-            df = df.sort_values("ts")
-            return df
+# Janela máxima para associar uma predição ao seu ground truth. As linhas de
+# local_inf_data_<nó> e inference_output_<nó> vêm do mesmo labeler, com o mesmo ts,
+# por isso o normal é coincidirem exatamente; a tolerância só absorve arredondamentos.
+GT_MATCH_TOLERANCE = pd.Timedelta("100ms")
 
+
+def load_inference_data(path):
+    """Carrega uma tabela Delta (predições do Agregador ou ground truth do Labeler)."""
+    try:
+        df = DeltaTable(path).to_pandas()
+        df["ts"] = pd.to_datetime(df["ts"], format="ISO8601").astype("datetime64[ns]")
+        return df.sort_values("ts")
     except Exception as e:
-        print(f"Erro ao carregar: {e}")
+        print(f"Erro ao carregar {path}: {e}")
         return pd.DataFrame()
+
+
+def match_predictions_to_ground_truth(df_pred, df_gt, tolerance=GT_MATCH_TOLERANCE):
+    """
+    Associa cada predição ao GLOBAL_STATUS (ground truth) com o mesmo timestamp.
+    Predições sem ground truth dentro da tolerância são descartadas e contadas,
+    para o número poder ser reportado (ex: no artigo).
+    """
+    merged = pd.merge_asof(
+        df_pred,
+        df_gt[["ts", "GLOBAL_STATUS"]],
+        on="ts",
+        direction="nearest",
+        tolerance=tolerance,
+    )
+    matched = merged.dropna(subset=["GLOBAL_STATUS"])
+    n_dropped = len(merged) - len(matched)
+    print(
+        f"🔗 Predições com ground truth: {len(matched)}/{len(merged)} "
+        f"(descartadas: {n_dropped}, tolerância {tolerance})"
+    )
+    return matched
 
 
 def analyze_consensus_impact(df, ground_truth_col=None):
@@ -150,31 +167,37 @@ class MetricsAnalyzer:
         self.df = None
 
     def run_analysis(self):
-        self.df_local = load_inference_data(self.data_path_local, label_map=self.label_map)
-        self.df_global = load_inference_data(self.data_path_global, label_map=self.label_map)
+        # data_path_local  -> predições (local_inf_data_<nó>, gravado pelo Agregador)
+        # data_path_global -> ground truth (inference_output_<nó>, gravado pelo Labeler)
+        self.df_local = load_inference_data(self.data_path_local)
+        self.df_global = load_inference_data(self.data_path_global)
 
-        merged_df = pd.merge_asof(
-            self.df_local,
-            self.df_global[["ts", self.df_global.columns[-1]]],
-            on="ts",
-            direction="nearest",
-        )
-        merged_df = merged_df.dropna()
-        if merged_df.empty:
-            print("⚠️ Nenhum dado para analisar.")
+        if self.df_local.empty or "GLOBAL_STATUS" not in self.df_global.columns:
+            print("⚠️ Faltam predições ou ground truth para analisar.")
             return
 
-        analyze_consensus_impact(merged_df, ground_truth_col="GLOBAL_STATUS")
-        generate_classification_reports(
-            merged_df,
-            y_true_col="GLOBAL_STATUS",
-            path=self.results_path,
-            device_id=self.device_id,
-        )
-        plot_confusion_matrices(
-            merged_df,
-            y_true_col="GLOBAL_STATUS",
-            label_map=self.label_map,
-            path=self.results_path,
-            device_id=self.device_id,
-        )
+        merged_df = match_predictions_to_ground_truth(self.df_local, self.df_global)
+        if merged_df.empty:
+            print("⚠️ Nenhuma predição com ground truth correspondente.")
+            return
+
+        # Um relatório por modo (GL / FL): os dois ficam na mesma tabela Delta.
+        # As figuras do artigo são feitas no Mac (analysis/make_figures.py).
+        groups = merged_df.groupby("mode") if "mode" in merged_df.columns else [("todos", merged_df)]
+        for mode, sub in groups:
+            print(f"\n===== Modo: {mode} ({len(sub)} predições) =====")
+            tag = f"{self.device_id}_{mode}"
+            analyze_consensus_impact(sub, ground_truth_col="GLOBAL_STATUS")
+            generate_classification_reports(
+                sub,
+                y_true_col="GLOBAL_STATUS",
+                path=self.results_path,
+                device_id=tag,
+            )
+            plot_confusion_matrices(
+                sub,
+                y_true_col="GLOBAL_STATUS",
+                label_map=self.label_map,
+                path=self.results_path,
+                device_id=tag,
+            )

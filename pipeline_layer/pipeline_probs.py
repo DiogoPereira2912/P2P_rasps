@@ -298,6 +298,7 @@ class Model_Manager:
 
         model_preds_payload = {
             "id": self.node_id,
+            "device": self.config["device_id"],
             "ts": time.time(),
             "data": data,
             "pred_probs": pred_probs.tolist(),
@@ -309,7 +310,12 @@ class Model_Manager:
         self.frames_counter.labels(node_id=self.node_id, algo_mode=self.mode).inc()
 
         if self.mode == "federated":
-            self.mqtt_com.publish(model_preds_payload, topic=f"{self.broker_id}/agg")
+            # Para o tópico do SERVIDOR CENTRAL: a bridge reencaminha <central>/# para ele.
+            # (Publicar no próprio tópico não sai deste nó.)
+            if not self.server_id:
+                print("⚠️ FL sem servidor central definido (escolher na UI). Predição não enviada.")
+                return
+            self.mqtt_com.publish(model_preds_payload, topic=f"{self.server_id}/agg")
         else:
             targets = resolve_targets_by_index(
                 self.current_peer_list, self.pipeline_dest_indices

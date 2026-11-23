@@ -1,37 +1,47 @@
-regras: 
+# =====================================================================
+# REGRAS GLOBAIS DO SHOP FLOOR — iguais em TODOS os nós
+# =====================================================================
+# Definem o estado do shop floor a partir de TODAS as câmaras. São usadas em 2 sítios,
+# com exatamente o mesmo critério (para a comparação no artigo ser justa):
+#
+#   - Ground truth (labeler):   a regra dispara se >= min_nos nós tiverem a coluna
+#                               <label>_<nó> = 1 (saída das regras locais, rules.yaml)
+#   - Consenso (aggregation):   a regra dispara se >= min_nos nós tiverem
+#                               probabilidade >= prob_threshold nessa classe
+#
+# Entre as regras que disparam vence a de MAIOR prioridade (número mais baixo).
+# Se nenhuma disparar -> SAFE.
+#
+# Este ficheiro é o template: tools/gen_configs.py copia-o para cada nó como
+# labeling/global_rules.yaml. Editar AQUI.
+# =====================================================================
+
+min_nos_default: 2     # nº mínimo de câmaras que têm de confirmar a regra (se a regra não disser outro)
+prob_threshold: 0.5    # probabilidade a partir da qual um nó "vê" a classe (só no consenso)
+
+regras:
 
   - nome: "Operacao Grua"
     label: "PERIGO_GRUA"
     prioridade: 1
-    condicoes:
-      rasp5: 1 # ALTERAR o rasp id para o atual
 
   - nome: "Possível Queda"
     label: "QUEDA_DETETADA"
     prioridade: 2
-    condicoes:
-      rasp5: 1
+    # min_nos: 1       # ex: perigo crítico -> basta 1 câmara
 
   - nome: "Pedido de Auxílio"
     label: "SINAL_SOS"
     prioridade: 3
-    condicoes:
-      rasp5: 1
 
   - nome: "Acesso a Corredor Logístico"
     label: "ZONA_FORKLIFT"
     prioridade: 4
-    condicoes:
-      rasp5: 1
 
   - nome: "Interação Proibida"
     label: "PROXIMIDADE_MAQUINA"
     prioridade: 5
-    condicoes:
-      rasp5: 1
 
   - nome: "Zona de Perigo"
     label: "INTRUSAO"
     prioridade: 6
-    condicoes:
-      rasp5: 1

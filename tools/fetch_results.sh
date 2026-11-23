@@ -34,6 +34,12 @@ while read -r NODE IP USER RPATH; do
   echo "📥 ${NODE} (${IP})"
   mkdir -p "$OUT/$NODE"
 
+  # Regras globais em uso nos Pis (iguais em todos): a análise precisa delas
+  if [ ! -f "$OUT/global_rules.yaml" ]; then
+    rsync -az -e "ssh $SSH_OPTS" "${USER}@${IP}:${RPATH}/labeling/global_rules.yaml" "$OUT/" < /dev/null \
+      || echo "   ⚠️  global_rules.yaml não copiado"
+  fi
+
   for FOLDER in data_exports results; do
     rsync -az -e "ssh $SSH_OPTS" "${USER}@${IP}:${RPATH}/${FOLDER}/" "$OUT/$NODE/$FOLDER/" < /dev/null \
       || { echo "   ⚠️  ${FOLDER}/ não copiado"; FAILED+=("${NODE}:${FOLDER}"); }

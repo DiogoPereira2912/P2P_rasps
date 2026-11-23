@@ -27,6 +27,8 @@ services:
     command:
       - '--config.file=/etc/prometheus/prometheus.yaml'
       - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=180d' # guardar as métricas das experiências (artigo)
+      - '--web.enable-lifecycle'             # recarregar config: curl -X POST localhost:9090/-/reload
     restart: always
 
   grafana:
@@ -36,10 +38,19 @@ services:
       - "3000:3000"
     volumes:
       - grafana_data:/var/lib/grafana
+      # Datasource + dashboards a partir de ficheiros (ver docs/control.md)
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/etc/grafana/dashboards:ro
     environment:
+      # Só é usada na PRIMEIRA criação do volume. Para mudar depois:
+      # docker exec -it grafana grafana cli admin reset-admin-password <nova>
       - GF_SECURITY_ADMIN_PASSWORD=admin
     restart: always
 
+# Nomes fixos: sem "name", o Docker prefixa com o nome da pasta (gossip_ui_..., control_...)
+# e uma mudança de pasta cria volumes novos e vazios -> dashboards/métricas "perdidas".
 volumes:
   prometheus_data:
+    name: control_prometheus_data
   grafana_data:
+    name: control_grafana_data
