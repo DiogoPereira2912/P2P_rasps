@@ -107,7 +107,7 @@ cd control
 
 # imagens públicas usadas no compose.yaml (versão TEM de coincidir com o compose)
 ./images.sh pull eclipse-mosquitto:2.0 mosquitto              # -> imgs/mosquitto.tar
-./images.sh pull gcr.io/cadvisor/cadvisor:v0.49.2 cadvisor    # -> imgs/cadvisor.tar
+./images.sh pull gcr.io/cadvisor/cadvisor:v0.47.0 cadvisor    # -> imgs/cadvisor.tar (v0.49.x incompatível com o Docker dos Pis)
 ```
 
 Tudo é compilado/descarregado para `linux/arm64` (Raspberry Pi 5).

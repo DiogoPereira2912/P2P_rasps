@@ -143,7 +143,7 @@ services:
       - PYTHONPATH=/app
 
   cadvisor:
-    image: gcr.io/cadvisor/cadvisor:v0.49.2 # tem de coincidir com o .tar levado para os Pis (pull_imgs.sh)
+    image: gcr.io/cadvisor/cadvisor:v0.47.0 # = control/imgs/cadvisor.tar (v0.49.x é incompatível com o Docker dos Pis)
     container_name: cadvisor
     ports:
       - "8080:8080"
