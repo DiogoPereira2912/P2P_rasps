@@ -8,32 +8,34 @@ Corre **no Mac** (pasta `roi_selection/`) porque abre uma janela OpenCV para des
 
 ## Utilização
 
+**Todos os Pis seguidos** (o mais rápido):
 ```bash
 cd roi_selection
+./select_rois.sh                 # todos os nós do inventory.yaml
+./select_rois.sh rasp2 rasp4     # só alguns
+```
+
+**Um Pi** (nome do inventory, IP ou hostname):
+```bash
 python3 ROI_selection_class.py rasp2
 ```
 
-O nome (`rasp2`) é procurado no `inventory.yaml` para obter o IP. Também aceita um IP ou hostname direto:
+### Passo a passo (por Pi)
+1. Abre um frame da **câmara 0**.
+2. Desenhar a ROI com o rato → `ENTER`/`ESPAÇO` confirma (`c` cancela).
+3. No terminal: `n` para outra ROI, `q` para terminar.
+4. As ROIs são guardadas em `roi_<nó>_video_0.yaml` (o anterior é apagado) e enviadas para o Pi.
 
-```bash
-python3 ROI_selection_class.py 192.168.0.111
-python3 ROI_selection_class.py hailopi
-```
+As ROIs são as áreas onde o modelo deteta e classifica pessoas: uma, várias ou a imagem toda.
+Cuidados para os artigos:
+- **Não sobrepor ROIs** na mesma câmara (uma pessoa na sobreposição é detetada duas vezes).
+- **O YOLO corre uma vez por ROI**: manter a mesma configuração de ROIs em todos os runs
+  (e registar no artigo quantas ROIs tem cada câmara).
 
-### Passo a passo
-1. Abre o feed da **câmara 0** e mostra um frame.
-2. Desenhar a ROI com o rato → `ENTER`/`ESPAÇO` para confirmar (`c` cancela).
-3. No terminal: `n` para outra ROI, `q` para passar à câmara seguinte.
-4. As ROIs são guardadas em `roi_<nó>_video_0.yaml` e enviadas para o Pi.
-5. Repete para a **câmara 1** (`roi_<nó>_video_1.yaml`).
+Só a câmara 0 é usada pelo `video_server` e pelo detetor. Para duas câmaras: `--duas-cameras`.
 
-No Pi, o `video_server` grava-as em `video_server/rois_url0.yaml` / `rois_url1.yaml` e liberta a câmara. Quando as duas câmaras estão libertadas, o healthcheck do `video_server` passa a OK e os serviços que dependem dele (detector, labeler, broker) arrancam.
-
-### Para os 5 Pis
-
-```bash
-for n in rasp1 rasp2 rasp3 rasp4 rasp5; do python3 ROI_selection_class.py $n; done
-```
+No Pi, o `video_server` grava-as em `video_server/rois_url0.yaml` e liberta a câmara; o
+healthcheck passa a OK e os serviços que dependem dele (detector, labeler, broker) arrancam.
 
 ## Configuração — `roi_selection/config.yaml`
 
@@ -43,5 +45,5 @@ resolution: { height: 1080, width: 1920 }
 ```
 
 ## ⚠️ Cuidados
-- **Repetir a seleção para o mesmo nó acrescenta ROIs ao ficheiro existente** (o `ROI_handler` escreve em modo *append*). Para recomeçar, apagar `roi_<nó>_video_*.yaml` antes.
-- **`tools/deploy.sh` / `update_git.sh` substituem** os `video_server/rois_url*.yaml` no Pi pelos do Mac (ver [deploy.md](deploy.md)).
+- As ROIs dos Pis (`video_server/rois_url*.yaml`) estão no `.rsyncignore`: o `tools/deploy.sh`
+  já **não** as substitui pelas do Mac.

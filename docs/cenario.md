@@ -43,6 +43,32 @@ Se a tabela mostrar disparos errados (muito provável para GRUA/PROXIMIDADE long
 
 ---
 
+## 0b. Regras v2 (em uso)
+
+As regras acima (v1, `labeling/rules.yaml` + `global_rules.example.yaml`) foram substituídas por
+um conjunto mais pequeno e independente da distância à câmara. **As v1 continuam no repo**; a
+versão em uso escolhe-se no `inventory.yaml` (`local_rules` e `global_rules_template`).
+
+| Prioridade | Classe | Condição (por pessoa) | `min_nos` |
+|---|---|---|---|
+| 1 | `QUEDA` | tronco a ≥ 60° da vertical **e** bounding box mais larga do que alta (≥ 1.0) | 1 |
+| 2 | `SINAL_SOS` | os **dois** pulsos acima do nariz (margem 0.1 × tronco) | 2 |
+| 3 | `BRACO_ESTENDIDO` | cotovelo ≥ 150° **e** pulso afastado do ombro na horizontal ≥ 0.8 × tronco | 2 |
+| — | `SAFE` | nenhuma regra (pessoas a trabalhar normalmente) | — |
+
+- Ficheiros: `labeling/rules_v2.yaml` (locais) e `labeling/global_rules_v2.example.yaml` (globais).
+- Várias pessoas no mesmo frame: a câmara dispara a regra se **pelo menos uma** pessoa a cumprir.
+- Teste com poses sintéticas (perto/longe da câmara, gestos e armadilhas):
+  `python3 labeling/test_rules_v2.py`. Correr outra vez depois de mudar limiares.
+- **Limiar a confirmar na calibração:** `bbox_aspect_min` da QUEDA. Baixar-se para apanhar uma
+  caixa dá ≈ 0.9 na pose sintética (logo abaixo de 1.0); se der falsas quedas, subir para ~1.3.
+- O `BRACO_ESTENDIDO` usa a componente **horizontal** do braço: um braço estendido na direção da
+  câmara fica encurtado na imagem e pode não disparar nessa câmara — outra câmara com outro
+  ângulo vê-o (bom exemplo da colaboração entre câmaras para o artigo).
+
+**Armadilhas a encenar** (não devem disparar): baixar-se para apanhar uma caixa, levantar só um
+braço, apontar com o braço dobrado.
+
 ## 1. Mapa de câmaras e zonas (preencher)
 
 Desenhar a planta do espaço e marcar que câmaras veem cada zona. É isto que decide se um

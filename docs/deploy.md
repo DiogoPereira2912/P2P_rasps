@@ -87,7 +87,7 @@ Para cada nó:
 
 **O que NUNCA é enviado nem apagado nos Pis** (`.rsyncignore`): `data_exports/`, `models/`, `results/`, `control/`, `roi_selection/`, `tools/`, `docs/`, `build/`, `inventory*.yaml`, `*.tar`.
 
-> ⚠️ `video_server/rois_url*.yaml` **é** enviado — um deploy substitui as ROIs que estão no Pi pelas que estão no Mac. Se isso deixar de ser desejado, acrescentar `video_server/rois_url*.yaml` ao `.rsyncignore`.
+> As ROIs de cada Pi (`video_server/rois_url*.yaml`) também não são enviadas nem apagadas.
 
 > O `update_git.sh` antigo continua a funcionar, mas não envia as configs geradas. A ideia é substituí-lo pelo `deploy.sh` depois de testado.
 
