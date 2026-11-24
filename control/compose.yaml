@@ -14,6 +14,7 @@ services:
       - ~/.ssh:/root/.ssh:ro
     environment:
       - REPO_PATH=/repo
+      - PROMETHEUS_URL=http://prometheus:9090 # resultados de sistema na tab 5
     restart: unless-stopped
 
   prometheus:

@@ -13,7 +13,18 @@ import json, threading, time, uuid, pickle, os
 from client.mqtt_layer import Communication_Layer
 import pandas as pd
 import numpy as np
-from prometheus_client import start_http_server, Counter
+from prometheus_client import start_http_server, Counter, Gauge
+
+CPU_TEMP_FILE = "/sys/class/thermal/thermal_zone0/temp"  # mili-graus Celsius
+
+
+def read_cpu_temp():
+    """Temperatura do SoC do Pi (o /sys do host é visível, só leitura, dentro do contentor)."""
+    try:
+        with open(CPU_TEMP_FILE) as f:
+            return int(f.read().strip()) / 1000.0
+    except Exception:
+        return float("nan")
 
 import warnings
 
@@ -76,6 +87,9 @@ class Model_Manager:
         Configura o Prometheus exporter para monitoramento.
         Inicia o servidor HTTP na porta 8000 para expor métricas.
         """
+        # Lida no momento de cada scrape do Prometheus (sem threads extra)
+        self.cpu_temp = Gauge("aidi_cpu_temp_celsius", "Temperatura do CPU do Raspberry Pi")
+        self.cpu_temp.set_function(read_cpu_temp)
         try:
             start_http_server(8000)
             print("📡 Prometheus exporter a correr na porta 8000")

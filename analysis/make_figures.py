@@ -16,7 +16,7 @@ sys.path.insert(0, str(ROOT / "aggregation_layer"))  # aggregation_algs (mesmo c
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from aggregation_algs.algs import aggregate_avg, rules_aggregation
-from experiment import load_experiments, recompute_consensus
+from experiment import load_experiments, recompute_consensus, load_event_logs, attach_human_gt
 from figures import (paper_style, fig_local_vs_consensus, fig_confusion, fig_corrections,
                      fig_latency, fig_methods, run_metrics)
 from metrics import classification_metrics, mcnemar, mean_ci
@@ -30,10 +30,10 @@ def class_list(rules, df):
     return sorted(set(df["GLOBAL_STATUS"]) | set(df["local_pred"]) | set(df["global_pred"]))
 
 
-def per_run_series(df, classes):
+def per_run_series(df, classes, gt_col="GLOBAL_STATUS"):
     """1 linha por (run, série): série = local | gossip | federated."""
-    local = run_metrics(df, classes, "local_pred").assign(series="local")
-    consensus = run_metrics(df, classes, "global_pred")
+    local = run_metrics(df, classes, "local_pred", gt_col).assign(series="local")
+    consensus = run_metrics(df, classes, "global_pred", gt_col)
     consensus["series"] = consensus["mode"]
     return pd.concat([local, consensus], ignore_index=True)
 
@@ -51,6 +51,9 @@ def summary_table(per_run):
 
 def method_comparison(df, classes, rules):
     """Recalcula offline vários métodos de consenso sobre as mesmas probabilidades."""
+    df = df[df["round_probs"].notna()]  # só linhas com as probabilidades de todos os nós
+    if df.empty:
+        return None
     label_map = {c: i for i, c in enumerate(classes)}
     methods = {"local": None, "avg": (aggregate_avg, {})}
     for k in (1, 2, 3):
@@ -75,14 +78,25 @@ def main():
     parser.add_argument("experiments", nargs="+", help="pastas experiments/<data>_<nome>")
     parser.add_argument("--out", help="pasta de saída (default: <1ª experiência>/figures)")
     parser.add_argument("--run-filter", help="só runs cujo run_id contém este texto (ex: cenarioA)")
+    parser.add_argument("--include-legacy", action="store_true",
+                        help="incluir linhas antigas sem run_id (gravadas antes do aggregation atual)")
+    parser.add_argument("--events", nargs="*",
+                        help="registos do tools/event_logger.py (default: experiments/event_logs/*.csv)")
     args = parser.parse_args()
 
     df, rules, report = load_experiments(args.experiments)
     print("\n".join(report))
     if df.empty:
         sys.exit("❌ Sem dados com ground truth.")
+    if not args.include_legacy:
+        legacy = (df["run_id"] == "sem_run_id").sum()
+        if legacy:
+            print(f"(ignoradas {legacy} linhas antigas sem run_id; usar --include-legacy para as incluir)")
+        df = df[df["run_id"] != "sem_run_id"]
     if args.run_filter:
         df = df[df["run_id"].str.contains(args.run_filter)]
+    if df.empty:
+        sys.exit("❌ Sem dados depois dos filtros.")
 
     out = Path(args.out or Path(args.experiments[0]) / "figures")
     out.mkdir(parents=True, exist_ok=True)
@@ -111,8 +125,29 @@ def main():
         made.append(fig_confusion(df, classes, mode, out))
     if rules and "round_probs" in df.columns:
         methods = method_comparison(df, classes, rules)
-        methods.to_csv(out / "consensus_methods.csv", index=False)
-        made.append(fig_methods(methods, out))
+        if methods is not None:
+            methods.to_csv(out / "consensus_methods.csv", index=False)
+            made.append(fig_methods(methods, out))
+
+    # --- Ground truth humano (registo de eventos), se existir para estes runs ---
+    event_files = args.events if args.events is not None else sorted((ROOT / "experiments" / "event_logs").glob("*.csv"))
+    df = attach_human_gt(df, load_event_logs(event_files))
+    human = df[df["HUMAN_GT"].notna()]
+    if not human.empty:
+        print(f"\n👤 Ground truth humano: {len(human)}/{len(df)} predições dentro de segmentos registados")
+        per_run_h = per_run_series(human, classes, gt_col="HUMAN_GT")
+        per_run_h.to_csv(out / "metrics_per_run_humanGT.csv", index=False)
+        summary_h = summary_table(per_run_h)
+        summary_h.to_csv(out / "metrics_summary_humanGT.csv", index=False)
+        print(summary_h.to_string(index=False))
+        made.append(fig_local_vs_consensus(per_run_h, out, name="fig1b_local_vs_consensus_humanGT"))
+        # Qualidade das próprias regras: GT das regras vs o que aconteceu
+        rules_q = classification_metrics(human["HUMAN_GT"], human["GLOBAL_STATUS"], classes)
+        pd.DataFrame([rules_q]).to_csv(out / "rules_vs_humanGT.csv", index=False)
+        print(f"\n📏 Regras vs realidade (GT das regras contra GT humano): "
+              f"macro-F1 {rules_q['macro_f1']:.3f}, accuracy {rules_q['accuracy']:.3f}")
+    else:
+        print("\n👤 Sem registo de eventos para estes runs (tools/event_logger.py).")
 
     print("\n📊 Figuras:")
     for p in filter(None, made):

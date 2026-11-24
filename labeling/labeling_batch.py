@@ -13,6 +13,9 @@ from labeling_utils import (
     status_from_votes,
 )
 from metrics import MetricsAnalyzer
+from prometheus_client import start_http_server
+
+PROMETHEUS_PORT = 8003  # tráfego MQTT do labeler (troca de datasets entre nós)
 
 RULES_LOCAL_PATH = "labeling/rules.yaml"
 RULES_GLOBAL_PATH = "labeling/global_rules.yaml"
@@ -71,6 +74,12 @@ class Labeller:
         # --- MQTT ---
         self._setup_mqtt_client()
         self._start_label_worker()
+
+        try:
+            start_http_server(PROMETHEUS_PORT)
+            print(f"📡 Prometheus exporter (labeler) na porta {PROMETHEUS_PORT}")
+        except Exception as e:
+            print(f"⚠ Aviso: Prometheus exporter não arrancou: {e}")
 
     def _setup_mqtt_client(self):
         self.mqtt_com = Communication_Layer(

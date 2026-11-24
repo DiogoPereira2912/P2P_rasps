@@ -117,9 +117,53 @@ def recompute_consensus(df, aggregate_fn, label_names, **kwargs):
     cache = {}
     decisions = []
     for raw in df["round_probs"]:
+        if not isinstance(raw, str):  # linha sem probabilidades dos nós
+            decisions.append(None)
+            continue
         if raw not in cache:
             probs = {k: [v] for k, v in json.loads(raw).items()}
             out = np.asarray(aggregate_fn(probs, **kwargs))
             cache[raw] = label_names[int(np.argmax(out[0]))]
         decisions.append(cache[raw])
     return pd.Series(decisions, index=df.index)
+
+
+# ---------------------------------------------------------------------------
+# Ground truth humano (tools/event_logger.py)
+# ---------------------------------------------------------------------------
+def load_event_logs(paths):
+    """Junta os registos de eventos (CSV do event_logger); ignora as notas."""
+    frames = [pd.read_csv(p) for p in paths]
+    if not frames:
+        return pd.DataFrame()
+    ev = pd.concat(frames, ignore_index=True)
+    ev = ev[ev["acao"] != "NOTA"].copy()
+    # Os ts das predições vêm de pd.to_datetime(..., unit="s") nos Pis (UTC, sem fuso):
+    # converter da mesma forma para alinharem.
+    ev["inicio"] = pd.to_datetime(ev["inicio_ts"], unit="s")
+    ev["fim"] = pd.to_datetime(ev["fim_ts"], unit="s")
+    return ev.sort_values("inicio")
+
+
+def attach_human_gt(df, events):
+    """
+    Acrescenta HUMAN_GT (estado esperado do shop floor segundo o guião) e ACAO a cada
+    predição cujo instante cai dentro de um segmento registado do run com a mesma etiqueta.
+    O run_id é <data>_<GL|FL>_<etiqueta>; a etiqueta do registo tem de ser a mesma.
+    """
+    df = df.copy()
+    df["HUMAN_GT"], df["ACAO"] = None, None
+    if events.empty:
+        return df
+    for tag, ev in events.groupby("tag"):
+        mask = df["run_id"].astype(str).str.endswith(f"_{tag}")
+        if not mask.any():
+            continue
+        sub = df.loc[mask].sort_values("ts")
+        m = pd.merge_asof(sub[["ts"]].reset_index(), ev[["inicio", "fim", "esperado", "acao"]],
+                          left_on="ts", right_on="inicio", direction="backward")
+        inside = m["ts"] < m["fim"]
+        idx = m.loc[inside, "index"]
+        df.loc[idx, "HUMAN_GT"] = m.loc[inside, "esperado"].values
+        df.loc[idx, "ACAO"] = m.loc[inside, "acao"].values
+    return df

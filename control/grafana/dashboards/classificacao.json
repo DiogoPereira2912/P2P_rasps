@@ -524,6 +524,34 @@
     }
   ],
   "annotations": {
-    "list": []
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      },
+      {
+        "name": "Runs",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "enable": true,
+        "iconColor": "rgba(0, 114, 178, 0.25)",
+        "expr": "max by (run_id, mode) (aidi_run_active) == 1",
+        "step": "5s",
+        "titleFormat": "{{mode}}",
+        "textFormat": "{{run_id}}",
+        "tagKeys": "mode",
+        "useValueForTime": false
+      }
+    ]
   }
 }

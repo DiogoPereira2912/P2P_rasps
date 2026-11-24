@@ -118,7 +118,8 @@ def build_prometheus(nodes):
             {"job_name": "prometheus", "static_configs": [{"targets": ["localhost:9090"]}]},
             job("hardware_cadvisor", 8080),   # CPU/RAM/rede por contentor
             job("throughput_python", 8000),   # pipeline: frames inferidos
-            job("aggregation", 8002),         # consenso: decisões, divergência, latência
+            job("aggregation", 8002),         # consenso: decisões, divergência, latência, run ativo
+            job("labeler", 8003),             # tráfego MQTT do labeler (troca de datasets)
         ],
     }
 

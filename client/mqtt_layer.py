@@ -1,5 +1,18 @@
 import json, queue, time, uuid
 from paho.mqtt import client as mqtt_client
+from prometheus_client import Counter
+
+# Tráfego MQTT por serviço, direção e tipo de mensagem (último nível do tópico:
+# agg, train, dataset, inference, peers, control, ...). Só aparece no Prometheus nos
+# serviços com exporter: pipeline (:8000), aggregation (:8002), labeler (:8003).
+MQTT_MESSAGES = Counter("aidi_mqtt_messages_total", "Mensagens MQTT", ["service", "direction", "kind"])
+MQTT_BYTES = Counter("aidi_mqtt_bytes_total", "Bytes de payload MQTT", ["service", "direction", "kind"])
+
+
+def topic_kind(topic):
+    """'192_168_0_110/agg' -> 'agg', 'system/control/' -> 'control'."""
+    parts = [p for p in topic.split("/") if p]
+    return parts[-1] if parts else "?"
 
 class Communication_Layer:
     """
@@ -33,6 +46,7 @@ class Communication_Layer:
         qos: qualidade do serviço MQTT
         """ 
         self.client_id = client_id
+        self.service = client_id.split("_")[0]  # pipeline_..., aggregation_..., labeller_...
         self.topic_broker_id = broker.replace(".", "_")
         self.base_topic = base_topic
         self.qos = qos
@@ -78,7 +92,11 @@ class Communication_Layer:
 
     def publish(self, payload, topic):
         full_topic = f"{self.base_topic}{topic}"
-        result = self.client.publish(full_topic, json.dumps(payload), qos=self.qos)
+        message = json.dumps(payload)
+        result = self.client.publish(full_topic, message, qos=self.qos)
+        kind = topic_kind(full_topic)
+        MQTT_MESSAGES.labels(self.service, "sent", kind).inc()
+        MQTT_BYTES.labels(self.service, "sent", kind).inc(len(message))
         if result[0] != 0:
             print(f"[{self.client_id}] Failed to publish to {full_topic}")
 
@@ -89,6 +107,9 @@ class Communication_Layer:
         '''
         # if msg.topic.startswith(f"{self.topic_broker_id}/"): # impede que ouça as suas
         #     return
+        kind = topic_kind(msg.topic)
+        MQTT_MESSAGES.labels(self.service, "received", kind).inc()
+        MQTT_BYTES.labels(self.service, "received", kind).inc(len(msg.payload))
         data = json.loads(msg.payload.decode())
         self.msg_queue.put((msg.topic, data)) 
 

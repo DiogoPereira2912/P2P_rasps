@@ -1,5 +1,6 @@
 import streamlit as st
-import os, time, glob, subprocess
+import os, sys, time, glob, subprocess
+import pandas as pd
 from yaml import Loader, load
 from mqtt_com import Processor
 
@@ -9,6 +10,15 @@ from mqtt_com import Processor
 REPO_PATH = os.getenv("REPO_PATH", "../..")
 INVENTORY_PATH = os.path.join(REPO_PATH, "inventory.yaml")
 DEPLOY_SCRIPT = os.path.join(REPO_PATH, "tools", "deploy.sh")  # código + config -> Pis
+
+# Métricas de sistema por run (lidas do Prometheus): mesmo código que tools/export_metrics.py
+sys.path.insert(0, os.path.join(REPO_PATH, "tools"))
+import importlib
+import export_metrics as em
+
+# O Streamlit volta a correr este ficheiro a cada interação mas mantém os módulos importados
+# em memória: recarregar para apanhar alterações em tools/export_metrics.py sem reiniciar a UI.
+em = importlib.reload(em)
 TAR_DIRECTORY = "/app/imgs"  # Diretoria onde estão os ficheiros .tar para deploy
 NODE_SCRIPT = "../node.sh"  # Ações SSH nos Pis (start / load)
 
@@ -105,6 +115,60 @@ def send_command_to_all(command, payload, raspberry_ids, port):
     return results
 
 
+# --- RESULTADOS (tab 5) ---
+@st.cache_data(ttl=30, show_spinner=False)
+def cached_runs(since):
+    return em.find_runs(em.parse_duration(since))
+
+
+@st.cache_data(show_spinner="A calcular métricas do run...")
+def cached_kpis(run_id, mode, start, end):
+    """Um run já terminado não muda: fica em cache (chave = run + intervalo)."""
+    run = {"run_id": run_id, "mode": mode, "start": start, "end": end}
+    return em.kpis(em.run_metrics(run), em.run_timeseries(run))
+
+
+def run_repo_command(cmd, label):
+    """Corre um script do repo (tools/, analysis/) e mostra o output. Devolve True se correu bem."""
+    result = subprocess.run(cmd, cwd=REPO_PATH, capture_output=True, text=True)
+    with st.expander(f"Logs: {label}", expanded=result.returncode != 0):
+        st.code((result.stdout + result.stderr)[-4000:] or "(sem output)")
+    if result.returncode != 0:
+        if "matplotlib" in result.stderr or "scipy" in result.stderr:
+            st.error("Faltam bibliotecas na imagem da UI: `cd control && docker compose up -d --build`.")
+        return False
+    return True
+
+
+def show_classification_gains(summary):
+    """Cartões local -> consenso (GL e FL) a partir do metrics_summary.csv ("média ± ic")."""
+    value = lambda cell: float(str(cell).split("±")[0])
+    rows = summary.set_index("series")
+    if "local" not in rows.index:
+        return
+    st.markdown("**🎯 Ganho do consenso face ao nó isolado** (contra o ground truth do shop floor)")
+    labels = {"macro_f1": "Macro-F1", "danger_recall": "Deteção de perigos (recall)",
+              "false_alarm_rate": "Falsos alarmes"}
+    cols = st.columns(len(labels))
+    for col, (metric, label) in zip(cols, labels.items()):
+        local = value(rows.loc["local", metric])
+        parts = [f"{name} {value(rows.loc[mode, metric]):.2f}" for mode, name in
+                 (("gossip", "GL"), ("federated", "FL")) if mode in rows.index]
+        best = max((value(rows.loc[m, metric]) for m in ("gossip", "federated") if m in rows.index), default=local)
+        delta = best - local
+        col.metric(label, f"local {local:.2f} → " + " · ".join(parts), f"{delta:+.2f}",
+                   delta_color="inverse" if metric == "false_alarm_rate" else "normal")
+
+
+def show_figures(rel_dir, where_text):
+    """Mostra as figuras PNG geradas (os PDF para o artigo ficam na mesma pasta)."""
+    pngs = sorted(glob.glob(os.path.join(REPO_PATH, rel_dir, "*.png")))
+    st.success(f"✅ {len(pngs)} figuras (PDF + PNG). {where_text}")
+    cols = st.columns(2)
+    for i, png in enumerate(pngs):
+        cols[i % 2].image(png, caption=os.path.basename(png).replace(".png", ""), width="stretch")
+
+
 # --- INTERFACE PRINCIPAL (TABS) ---
 tab1, tab2, tab3, tab4, tab5 = st.tabs(
     [
@@ -129,7 +193,7 @@ with tab1:
         key="startup_select",  # Key única para não dar conflito com o multiselect do deploy
     )
 
-    if st.button("🔌 Levantar Serviço", type="primary", use_container_width=True):
+    if st.button("🔌 Levantar Serviço", type="primary", width="stretch"):
         if not startup_ips:
             st.warning("⚠️ Seleciona pelo menos um Raspberry Pi para iniciar.")
         else:
@@ -177,7 +241,7 @@ with tab1:
         value=True,
     )
 
-    if st.button("📤 Atualizar Código", type="primary", use_container_width=True):
+    if st.button("📤 Atualizar Código", type="primary", width="stretch"):
         # O deploy.sh trabalha com os nomes do inventário (config gerada por nó),
         # por isso IPs que não estão no inventory.yaml não podem ser atualizados.
         sem_inventario = [ip for ip in update_ips if ip not in NODE_NAMES]
@@ -238,7 +302,7 @@ with tab1:
             nomes_tar,
         )
 
-    if st.button("🚀 Deploy Images", type="primary", use_container_width=True):
+    if st.button("🚀 Deploy Images", type="primary", width="stretch"):
 
         if not target_ips:
             st.warning("⚠️ Seleciona pelo menos um Raspberry Pi para continuar.")
@@ -287,7 +351,7 @@ with tab2:
         if st.button(
             "🔴 INICIAR GRAVAÇÃO",
             type="primary",
-            use_container_width=True,
+            width="stretch",
             key="btn_col_start",
         ):
             # CORREÇÃO: Passar a config aqui!
@@ -306,7 +370,7 @@ with tab2:
         if st.button(
             "⏹ PARAR GRAVAÇÃO",
             type="secondary",
-            use_container_width=True,
+            width="stretch",
             key="btn_col_stop",
         ):
             send_command_to_all("STOP", {}, raspberry_ids, port)
@@ -323,7 +387,7 @@ with tab3:
         if st.button(
             "🏋️ INICIAR TREINO",
             type="primary",
-            use_container_width=True,
+            width="stretch",
             key="btn_train_start",
         ):
             with st.status("A enviar ordem de TREINO...", expanded=True):
@@ -336,7 +400,7 @@ with tab3:
         if st.button(
             "⏹ PARAR TREINO",
             type="secondary",
-            use_container_width=True,
+            width="stretch",
             key="btn_train_stop",
         ):
             send_command_to_all("STOP", {}, raspberry_ids, port)
@@ -382,7 +446,7 @@ with tab4:
         if st.button(
             "🚀 INICIAR INFERÊNCIA",
             type="primary",
-            use_container_width=True,
+            width="stretch",
             key="btn_inf_start",
         ):
 
@@ -420,7 +484,7 @@ with tab4:
         if st.button(
             "⏹ PARAR SISTEMA",
             type="secondary",
-            use_container_width=True,
+            width="stretch",
             key="btn_inf_stop",
         ):
             send_command_to_all("STOP", {}, raspberry_ids, port)
@@ -437,7 +501,7 @@ with tab5:
         if st.button(
             "🚀 METRICS GENERATION",
             type="primary",
-            use_container_width=True,
+            width="stretch",
             key="btn_test_start",
         ):
             with st.status("A lançar fase de teste...", expanded=True):
@@ -450,11 +514,129 @@ with tab5:
         if st.button(
             "⏹ PARAR SISTEMA",
             type="secondary",
-            use_container_width=True,
+            width="stretch",
             key="btn_test_stop",
         ):
             send_command_to_all("STOP", {}, raspberry_ids, port)
             st.error("Kill Switch Enviado!")
+
+    # ------------------------------------------------------------------
+    # Resultados de sistema (Prometheus) — artigo de desempenho GL vs FL
+    # ------------------------------------------------------------------
+    st.markdown("---")
+    st.header("📊 Resultados de sistema (GL vs FL)")
+    st.caption(
+        "Lidos do Prometheus, dentro da janela de cada run (do INFERENCE ao STOP). "
+        "Os Pis não precisam de estar ligados."
+    )
+
+    since = st.selectbox("Procurar runs nas últimas", ["6h", "24h", "3d", "7d"], index=1)
+    try:
+        runs = cached_runs(since)
+    except Exception as e:
+        runs = []
+        st.error(f"❌ Sem ligação ao Prometheus: {e}")
+
+    if not runs:
+        st.info("Nenhum run encontrado neste intervalo.")
+    else:
+        run_labels = {
+            r["run_id"]: f"{r['run_id']}  ({r['mode']}, {r['end'] - r['start']:.0f} s)" for r in runs
+        }
+        selected = st.multiselect(
+            "Runs", options=list(run_labels), default=list(run_labels), format_func=run_labels.get
+        )
+        chosen = [r for r in runs if r["run_id"] in selected]
+
+        if chosen:
+            table = pd.DataFrame([cached_kpis(r["run_id"], r["mode"], r["start"], r["end"]) for r in chosen])
+            st.dataframe(table, hide_index=True, width="stretch")
+
+            # Comparação rápida GL vs FL (média dos runs selecionados)
+            by_mode = table.groupby("modo").mean(numeric_only=True)
+            first = table.groupby("modo").first()
+            if {"gossip", "federated"}.issubset(by_mode.index):
+                gl, fl = by_mode.loc["gossip"], by_mode.loc["federated"]
+                c1, c2, c3 = st.columns(3)
+                c1.metric("Mensagens de consenso/min (GL vs FL)",
+                          f"{gl['msgs consenso/min']:.0f} vs {fl['msgs consenso/min']:.0f}",
+                          f"GL = {gl['msgs consenso/min'] / max(fl['msgs consenso/min'], 1):.1f}× FL",
+                          delta_color="off")
+                c2.metric("Latência decisão p50 (GL vs FL)",
+                          f"{gl['latência decisão p50 (s)']:.2f} vs {fl['latência decisão p50 (s)']:.2f} s")
+                c3.metric("CPU consenso máx/mín nó (GL | FL)",
+                          f"{gl['CPU consenso máx nó (%)']:.1f}/{gl['CPU consenso mín nó (%)']:.1f} | "
+                          f"{fl['CPU consenso máx nó (%)']:.1f}/{fl['CPU consenso mín nó (%)']:.1f} %",
+                          "FL concentra no central", delta_color="off")
+
+                # Complemento: o que o GL ganha em troca das mensagens a mais
+                st.markdown("**🛡️ Robustez e distribuição** (o que o GL ganha em troca das mensagens a mais)")
+                c1, c2, c3, c4 = st.columns(4)
+                c1.metric("Nós que decidem", f"GL {first.loc['gossip', 'nós que decidem']}",
+                          f"FL {first.loc['federated', 'nós que decidem']}", delta_color="off")
+                c2.metric("Ponto único de falha", f"GL: {first.loc['gossip', 'ponto único de falha']}",
+                          f"FL: {first.loc['federated', 'ponto único de falha']}", delta_color="off")
+                c3.metric("Desequilíbrio de carga (máx/mín)",
+                          f"GL {gl['desequilíbrio de carga (máx/mín)']:.1f}×",
+                          f"FL {fl['desequilíbrio de carga (máx/mín)']:.1f}× (central)", delta_color="off")
+                c4.metric("Consenso alterou a decisão local",
+                          f"GL {gl['consenso alterou local (%)']:.0f}% · FL {fl['consenso alterou local (%)']:.0f}%",
+                          help="Rondas em que a decisão global foi DIFERENTE da predição local do nó. "
+                               "Não diz se a mudança acertou: isso vê-se contra o ground truth, na secção "
+                               "de classificação abaixo. Com todos os nós ativos, GL e FL decidem o mesmo, "
+                               "por isso este valor deve ser parecido nos dois modos.")
+
+            if st.button("📥 Exportar métricas + figuras de sistema", type="primary",
+                         width="stretch", key="btn_export_system"):
+                out_rel = f"experiments/system_metrics/{time.strftime('%Y-%m-%d_%H%M%S')}"
+                with st.status("A exportar do Prometheus e a gerar figuras...", expanded=True) as status:
+                    ok = run_repo_command(
+                        [sys.executable, "tools/export_metrics.py", "--since", since,
+                         "--run-ids", ",".join(selected), "--out", out_rel], "Export")
+                    if ok:
+                        ok = run_repo_command(
+                            [sys.executable, "analysis/system_figures.py", out_rel], "Figuras")
+                    status.update(label="Concluído" if ok else "Falhou", state="complete" if ok else "error")
+                if ok:
+                    show_figures(out_rel + "/figures", f"No Mac: P2P_rasps/{out_rel}/")
+
+    # ------------------------------------------------------------------
+    # Resultados de classificação (dados dos Pis) — artigo do caso de uso
+    # ------------------------------------------------------------------
+    st.markdown("---")
+    st.header("🎯 Resultados de classificação (local vs consenso)")
+    st.caption(
+        "Traz data_exports/ de todos os Pis (tools/fetch_results.sh) e gera as figuras "
+        "(analysis/make_figures.py). Os Pis têm de estar ligados."
+    )
+    col_a, col_b = st.columns(2)
+    fetch_name = col_a.text_input("Nome da experiência", value="sessao", key="fetch_name")
+    run_filter = col_b.text_input("Filtrar runs (texto do run_id, opcional)", key="fetch_filter",
+                                  placeholder="ex: cenarioA")
+
+    if st.button("📥 Trazer dados dos Pis + figuras de classificação", type="primary",
+                 width="stretch", key="btn_export_clf"):
+        with st.status("A trazer dados dos Pis...", expanded=True) as status:
+            result = subprocess.run(["bash", "tools/fetch_results.sh", fetch_name.strip() or "sessao"],
+                                    cwd=REPO_PATH, capture_output=True, text=True)
+            with st.expander("Logs do fetch"):
+                st.code(result.stdout + result.stderr)
+            exp_dirs = [line.split("Resultados em:")[-1].strip()
+                        for line in result.stdout.splitlines() if "Resultados em:" in line]
+            ok = bool(exp_dirs)
+            if ok:
+                cmd = [sys.executable, "analysis/make_figures.py", exp_dirs[0]]
+                if run_filter.strip():
+                    cmd += ["--run-filter", run_filter.strip()]
+                ok = run_repo_command(cmd, "Figuras")
+            status.update(label="Concluído" if ok else "Falhou", state="complete" if ok else "error")
+        if ok:
+            summary = os.path.join(REPO_PATH, exp_dirs[0], "figures", "metrics_summary.csv")
+            if os.path.exists(summary):
+                show_classification_gains(pd.read_csv(summary))
+                st.subheader("Resumo (média ± IC 95% entre runs)")
+                st.dataframe(pd.read_csv(summary), hide_index=True, width="stretch")
+            show_figures(exp_dirs[0] + "/figures", f"No Mac: P2P_rasps/{exp_dirs[0]}/")
 
 st.markdown("---")
 st.caption("📡 AIDI Gossip Protocol | Controlo Descentralizado")

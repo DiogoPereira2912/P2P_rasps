@@ -1,3 +1,8 @@
 streamlit
 paho-mqtt
 PyYAML
+# figuras de resultados (tab 5): analysis/
+matplotlib
+scipy
+pandas
+pyarrow

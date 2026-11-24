@@ -70,6 +70,7 @@ class Aggregator:
         self.agg_method = self.config.get("aggregation_method", "rules")
         # Identificador da experiência (enviado pela UI no comando INFERENCE)
         self.run_id = None
+        self.run_mode = self.mode
         print(f"⚙️ Método de agregação: {self.agg_method}")
 
         self._setup_prometheus_metrics()
@@ -130,8 +131,12 @@ class Aggregator:
                 else:
                     print(f"👷 Sou WORKER (Agregador). O orquestrador é o {self.server_ip}")
 
+            if self.run_id:  # qualquer comando novo termina o run anterior
+                self.m_run_active.labels(run_id=self.run_id, mode=self.run_mode).set(0)
             if cmd == "INFERENCE":
                 self.run_id = config_recebida.get("run_id") or time.strftime("%Y%m%d_%H%M%S")
+                self.run_mode = self.mode  # guardado: o modo pode mudar no próximo comando
+                self.m_run_active.labels(run_id=self.run_id, mode=self.run_mode).set(1)
                 print(f"🏷️  Run: {self.run_id}")
 
             self.phase = cmd
@@ -149,6 +154,8 @@ class Aggregator:
         self.m_decisions = Counter("aidi_agg_decisions_total", "Decisões globais por classe", labels + ["decision"])
         self.m_divergence = Counter("aidi_agg_divergence_total", "Rondas em que a decisão global difere da local", labels)
         self.m_nodes = Gauge("aidi_agg_nodes_in_round", "Nº de nós na última ronda", ["node"])
+        # 1 enquanto o run está ativo: o Grafana desenha uma faixa por run (anotações)
+        self.m_run_active = Gauge("aidi_run_active", "Run de inferência ativo", ["run_id", "mode"])
         self.m_msg_delay = Histogram(
             "aidi_agg_message_delay_seconds", "Predição publicada -> recebida no agregador",
             ["node", "mode"], buckets=(0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5),

@@ -66,7 +66,7 @@ def _save(fig, out_dir, name):
 # ---------------------------------------------------------------------------
 # 1. Local vs consenso (GL / FL), média ± IC 95% entre runs
 # ---------------------------------------------------------------------------
-def fig_local_vs_consensus(per_run, out_dir, metrics=tuple(METRIC_LABELS)):
+def fig_local_vs_consensus(per_run, out_dir, metrics=tuple(METRIC_LABELS), name="fig1_local_vs_consensus"):
     """per_run: DataFrame com 1 linha por (run_id, série) e as métricas em colunas."""
     series = [s for s in ("local", "gossip", "federated") if s in per_run["series"].unique()]
     x = np.arange(len(metrics))
@@ -85,7 +85,7 @@ def fig_local_vs_consensus(per_run, out_dir, metrics=tuple(METRIC_LABELS)):
     # legenda por cima do gráfico, para não tapar barras
     ax.legend(frameon=False, ncol=len(series), loc="lower center", bbox_to_anchor=(0.5, 1.0),
               handlelength=1, columnspacing=0.8)
-    return _save(fig, out_dir, "fig1_local_vs_consensus")
+    return _save(fig, out_dir, name)
 
 
 # ---------------------------------------------------------------------------
@@ -180,11 +180,11 @@ def fig_methods(method_scores, out_dir, metric="macro_f1"):
     return _save(fig, out_dir, "fig5_consensus_methods")
 
 
-def run_metrics(df, classes, pred_col):
-    """Métricas por run_id (cada run = uma repetição)."""
+def run_metrics(df, classes, pred_col, gt_col="GLOBAL_STATUS"):
+    """Métricas por run_id (cada run = uma repetição), contra o ground truth gt_col."""
     rows = []
     for run_id, sub in df.groupby("run_id"):
-        m = classification_metrics(sub["GLOBAL_STATUS"], sub[pred_col], classes)
+        m = classification_metrics(sub[gt_col], sub[pred_col], classes)
         m["run_id"] = run_id
         m["mode"] = sub["mode"].iloc[0]
         rows.append(m)
