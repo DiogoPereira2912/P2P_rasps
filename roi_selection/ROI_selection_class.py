@@ -124,20 +124,21 @@ class ROIManager:
 
 
 if __name__ == "__main__":
-    # Modo de uso: docs/rois.md
+    # Modo de uso: docs/rois.md (ou ./select_rois.sh para todos os Pis)
     if len(sys.argv) < 2:
-        print("👉 Uso: python3 ROI_selection_class.py <nome_do_nó | ip | hostname>")
+        print("👉 Uso: python3 ROI_selection_class.py <nome_do_nó | ip | hostname> [--duas-cameras]")
         sys.exit(1)
 
     target = sys.argv[1]
+    # O video_server só usa a câmara 0 (CAM1 comentada): a câmara 1 só com --duas-cameras
+    cameras = ["url0", "url1"] if "--duas-cameras" in sys.argv else ["url0"]
     manager = ROIManager(target)
 
-    # Um ficheiro por nó e por câmara, para não misturar as ROIs de Pis diferentes
-    yaml_video_0 = f"roi_{target}_video_0.yaml"
-    yaml_video_1 = f"roi_{target}_video_1.yaml"
-
-    rois_video_1 = manager.select_rois_for_video(video_key="url0", yaml_path=yaml_video_0)
-    manager.send_roi(video_key="url0", local_yaml_path=yaml_video_0)
-
-    rois_video_2 = manager.select_rois_for_video(video_key="url1", yaml_path=yaml_video_1)
-    manager.send_roi(video_key="url1", local_yaml_path=yaml_video_1)
+    for video_key in cameras:
+        # Um ficheiro por nó e por câmara. Apagar o anterior: o ROIHandler escreve em
+        # modo append e, sem isto, as ROIs novas juntavam-se às antigas.
+        yaml_path = f"roi_{target}_video_{video_key[-1]}.yaml"
+        if os.path.exists(yaml_path):
+            os.remove(yaml_path)
+        manager.select_rois_for_video(video_key=video_key, yaml_path=yaml_path)
+        manager.send_roi(video_key=video_key, local_yaml_path=yaml_path)

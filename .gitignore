@@ -10,3 +10,5 @@ control/imgs/
 build/
 inventory.secrets.yaml
 experiments/
+# ROIs desenhadas no Mac (cada Pi tem as suas; não vão para o git)
+roi_selection/roi_*.yaml

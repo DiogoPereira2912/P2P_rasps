@@ -18,3 +18,4 @@ inventory.secrets.yaml
 docs/
 experiments/
 analysis/
+video_server/rois_url*.yaml
