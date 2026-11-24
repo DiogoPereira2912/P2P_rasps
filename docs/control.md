@@ -22,6 +22,8 @@ O contentor da UI monta:
 
 Para correr a UI fora do Docker: `cd control/streamlit && streamlit run gossip_ui.py`.
 
+Depois de alterar `control/streamlit/requirements.txt`: `docker compose up -d --build control_center`.
+
 ---
 
 ## A UI
@@ -41,7 +43,10 @@ Para correr a UI fora do Docker: `cd control/streamlit && streamlit run gossip_u
 | 2. Data Collection | 🔴 Iniciar Gravação | comando `COLLECTION` — os nós gravam dados raw e trocam datasets |
 | 3. Treino | 🏋️ Iniciar Treino | comando `TRAIN` — cada nó treina o seu modelo com `local_output_<nó>` e guarda em `models/` |
 | 4. Inferência | 🚀 Iniciar Inferência | comando `INFERENCE` com o modo **GL** ou **FL** (+ servidor central em FL) |
-| 5. Metrics | 🚀 Metrics Generation | comando `METRICS` — gera os resultados de desempenho |
+| 5. Metrics | 🚀 Metrics Generation | comando `METRICS` — relatórios rápidos em cada Pi (`results/`) |
+| | 📊 Resultados de sistema | escolher runs → tabela por run + comparação GL vs FL (mensagens, latência, CPU do consenso), complementada com robustez e distribuição (nós que decidem, ponto único de falha, desequilíbrio de carga, correções do consenso). Do Prometheus; Pis podem estar desligados |
+| | 📥 Exportar métricas + figuras de sistema | `tools/export_metrics.py` + `analysis/system_figures.py` → `experiments/system_metrics/<data>/` no Mac, figuras mostradas na página |
+| | 📥 Trazer dados dos Pis + figuras de classificação | `tools/fetch_results.sh` + `analysis/make_figures.py` → `experiments/<data>_<nome>/` no Mac (Pis ligados) |
 | todas | ⏹ Parar | comando `STOP` |
 
 Os comandos são publicados em `system/control/` no broker de **cada** IP da lista.
@@ -57,7 +62,12 @@ Cada série tem a etiqueta `node` (`rasp1`, ...). Recolhe de cada nó:
 |---|---|---|
 | `hardware_cadvisor` | 8080 | cAdvisor (CPU, RAM, rede por contentor) |
 | `throughput_python` | 8000 | pipeline (`aidi_frames_processed_total`) |
-| `aggregation` | 8002 | consenso: rondas, decisões por classe, divergência local≠global, latências |
+| `aggregation` | 8002 | consenso: rondas, decisões por classe, divergência local≠global, latências, run ativo |
+| `labeler` | 8003 | tráfego MQTT do labeler (troca de datasets) |
+
+Além disso, pipeline, aggregation e labeler expõem o **tráfego MQTT** (`aidi_mqtt_messages_total`,
+`aidi_mqtt_bytes_total`, por serviço, direção e tipo de mensagem) e o pipeline a **temperatura do CPU**
+(`aidi_cpu_temp_celsius`).
 
 Depois de mudar o inventário (sem reiniciar o Prometheus):
 ```bash
@@ -71,16 +81,19 @@ As métricas ficam guardadas 180 dias (volume `control_prometheus_data`).
 
 | Dashboard | Conteúdo |
 |---|---|
-| **Gossip · Performance do Sistema** | nós online, CPU/RAM por nó e por serviço, tráfego de rede, frames/s, latência MQTT |
+| **Gossip · Performance do Sistema** | nós online, CPU/RAM por nó e por serviço, tráfego de rede, frames/s, latência MQTT, temperatura, mensagens e bytes por tipo, tráfego total por run |
 | **Gossip · Classificação & Consenso** | rondas/min, decisões globais por classe, divergência local≠global, latência de decisão, GL vs FL |
 
-Ambas têm filtros por nó (e por modo, na de classificação). A precisão contra o ground truth
+Ambas têm filtros por nó (e por modo, na de classificação) e mostram cada **run como uma faixa azul**
+(do INFERENCE ao STOP, com o `run_id` ao passar o rato). Para ver as métricas de um run, selecionar
+a faixa com o rato no gráfico (zoom ao intervalo). A precisão contra o ground truth
 não é em tempo real: está nas figuras do [analysis.md](analysis.md).
 
 **As dashboards são ficheiros** (`control/grafana/dashboards/*.json`), carregados automaticamente
 no arranque juntamente com a datasource (`control/grafana/provisioning/`). Por isso sobrevivem
 a resets do Grafana, mudanças de password e de volumes, e ficam no git.
 
+- Depois de editar os JSON: `cd control && docker compose restart grafana` (o Grafana só relê no arranque).
 - Alterar uma dashboard na UI funciona, mas **não altera o ficheiro**. Para guardar:
   *Share → Export → Save to file* e substituir o JSON em `control/grafana/dashboards/`.
 - **Mudar a password sem perder nada:**

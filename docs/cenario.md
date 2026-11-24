@@ -185,8 +185,23 @@ Isto dá um **segundo ground truth independente das regras** — o que um reviso
 
 Comparar os dois mede também a qualidade das próprias regras (que entra na discussão do artigo).
 
-*(Ferramenta proposta: `tools/event_logger.py` — mostra a próxima ação do `cenario_A.csv` e grava
-o instante em que se carrega Enter. Ainda não implementada.)*
+### Como registar (`tools/event_logger.py`, no Mac)
+
+```bash
+python3 tools/event_logger.py docs/cenarios/cenario_A.csv --tag cenarioA_rep1
+```
+
+- `--tag`: **a mesma etiqueta escrita na UI** (é assim que a análise liga o registo ao run).
+- Iniciar a inferência na UI → carregar Enter no instante 0:00 do guião.
+- O terminal mostra a ação atual, a instrução e a seguinte. **Enter** no fim de cada ação.
+- `n <texto>` + Enter: nota com o instante (ex: `n rasp1 desligado` no cenário B).
+- `q` + Enter: abortar (o que já foi registado fica gravado).
+- `--auto`: avança sozinho pelos tempos do guião (o ator segue o relógio; menos preciso).
+
+Grava em `experiments/event_logs/<data_hora>_<tag>.csv`. O `analysis/make_figures.py` usa-o
+automaticamente (§ "Ground truth humano" do [analysis.md](analysis.md)).
+
+> `experiments/` não vai para o git: fazer cópia de segurança dos registos (são dados da experiência).
 
 ---
 

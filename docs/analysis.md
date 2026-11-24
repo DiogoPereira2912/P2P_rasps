@@ -93,6 +93,20 @@ Tamanho de coluna IEEE (3.5" / 7.16"), fonte 8 pt, sem título (vai na legenda d
 Os nomes curtos das classes (ex: `QUEDA_DETETADA` → `FALL`) estão em `SHORT_NAMES` em
 `analysis/figures.py`.
 
+### Ground truth humano
+
+Se existirem registos do `tools/event_logger.py` (por defeito em `experiments/event_logs/`, ou
+`--events <ficheiros>`), cada predição recebe também o `HUMAN_GT`: o estado esperado do shop
+floor no segmento do guião em que caiu (coluna `esperado_min_nos_2` do guião). Saídas extra:
+
+| Ficheiro | Conteúdo |
+|---|---|
+| `fig1b_local_vs_consensus_humanGT.pdf` | Igual à fig. 1, mas contra o que realmente aconteceu |
+| `metrics_summary_humanGT.csv`, `metrics_per_run_humanGT.csv` | Métricas contra o GT humano |
+| `rules_vs_humanGT.csv` | Qualidade das próprias regras: GT das regras vs GT humano |
+
+A ligação registo ↔ run é pela etiqueta: o `run_id` termina em `_<tag>`.
+
 ### Métricas (classes desequilibradas: quase tudo é SAFE)
 
 - **Macro-F1 / balanced accuracy / MCC**: não são dominadas pela classe SAFE.
@@ -100,6 +114,40 @@ Os nomes curtos das classes (ex: `QUEDA_DETETADA` → `FALL`) estão em `SHORT_N
   É a métrica de segurança.
 - **False alarm rate**: instantes SAFE classificados como perigo.
 - **McNemar**: diz se a diferença local vs consenso é estatisticamente significativa.
+
+---
+
+## 3b. Métricas de sistema (artigo 2: GL vs FL)
+
+As métricas de desempenho vêm do Prometheus (não dos Pis). Cada run é detetado pelo
+`aidi_run_active` (do INFERENCE ao STOP) e as métricas são calculadas **dentro da janela do run**.
+
+```bash
+python3 tools/export_metrics.py --since 24h                      # todos os runs das últimas 24 h
+python3 tools/export_metrics.py --since 2d --run-filter cenarioA # só alguns
+python3 analysis/system_figures.py experiments/system_metrics/<data>
+```
+
+O Prometheus guarda 180 dias, por isso o export pode ser feito mais tarde (com o Mac ligado ao
+Prometheus local, os Pis não precisam de estar ligados).
+
+| Ficheiro | Conteúdo |
+|---|---|
+| `runs.csv` | run_id, modo, início, fim |
+| `system_metrics.csv` | por run e nó: mensagens/bytes por tipo, CPU/RAM por serviço, latências p50/p95, rondas, temperatura |
+| `system_timeseries.csv` | séries dentro de cada run (decisões/min, tráfego, CPU, temperatura por nó) |
+| `figures/system_summary.csv` | tabela para o artigo (média ± IC 95% entre runs) |
+| `figS1_traffic_by_kind` | mensagens/min entre nós por tipo (predições, decisões, datasets) |
+| `figS2_traffic_by_node` | mensagens de consenso recebidas por nó (concentração no central em FL) |
+| `figS3_consensus_cpu` | CPU do consenso por nó |
+| `figS4_latency` | latência mensagem e decisão (p50/p95) |
+| `figS5_resources_by_service` | CPU por serviço: peso do detetor vs consenso |
+| `figS6_temperature` | temperatura máxima por nó (linha de throttling a 85 °C) |
+| `figS7_rounds_timeline_<run>` | decisões/min por nó ao longo do run (robustez, cenário B) |
+| `figS8_scalability` | mensagens de consenso vs nº de nós (só se houver runs com nº de nós diferente) |
+
+Tráfego **entre nós** = `agg` (predições), `train` (decisões), `dataset` (merge do GT).
+`inference`, `raw_detections` e `peers` ficam no broker local de cada Pi.
 
 ---
 
