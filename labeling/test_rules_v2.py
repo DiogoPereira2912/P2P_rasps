@@ -2,7 +2,9 @@
 """
 Teste das regras v2 (labeling/rules_v2.yaml) com poses sintéticas: cada gesto deve disparar
 SÓ a regra certa, e as "armadilhas" não devem disparar nada — perto e longe da câmara.
-Correr depois de mudar limiares: python3 labeling/test_rules_v2.py
+Correr depois de mudar limiares:
+    python3 labeling/test_rules_v2.py                            # rules_v2.yaml
+    python3 labeling/test_rules_v2.py labeling/rules_v2_sim.yaml # versão de simulação
 """
 import math
 import sys
@@ -14,7 +16,9 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from labeling_utils import body_conditions_ok, frame_level
 
-RULES = yaml.safe_load(open(Path(__file__).resolve().parent / "rules_v2.yaml"))
+RULES_PATH = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().parent / "rules_v2.yaml"
+RULES = yaml.safe_load(open(RULES_PATH))
+SIM = "sim" in RULES_PATH.name  # na simulação, a QUEDA é agachar-se até ao chão
 
 # Pose de referência de pé, de frente para a câmara (tronco = 250 px; y cresce para baixo)
 STANDING = {
@@ -39,6 +43,10 @@ def poses():
     p["QUEDA: deitado no chão"] = rotate(STANDING, STANDING.keys(), 90, (0, 0))
     upper = [0, 5, 6, 7, 8, 9, 10]
     p["armadilha: baixar-se p/ apanhar caixa"] = rotate(STANDING, upper, -75, (0, 100))
+    # de cócoras: anca desce até perto dos pés, joelhos para fora, tronco direito
+    crouch = {i: (x, y + 150) for i, (x, y) in STANDING.items() if i not in (13, 14, 15, 16)}
+    crouch.update({13: (-110, 200), 14: (110, 200), 15: (-50, 350), 16: (50, 350)})
+    p["agachado até ao chão (de cócoras)"] = crouch
     p["SOS: dois braços acima da cabeça"] = {**STANDING, 7: (-80, -240), 8: (80, -240), 9: (-60, -330), 10: (60, -330)}
     p["armadilha: levantar só um braço"] = {**STANDING, 7: (-80, -240), 9: (-60, -330)}
     p["BRAÇO ESTENDIDO: braço para o lado"] = {**STANDING, 8: (170, -150), 10: (280, -150)}
@@ -72,11 +80,14 @@ EXPECTED = {
     "armadilha: baixar-se p/ apanhar caixa": [], "SOS: dois braços acima da cabeça": ["SINAL_SOS"],
     "armadilha: levantar só um braço": [], "BRAÇO ESTENDIDO: braço para o lado": ["BRACO_ESTENDIDO"],
     "armadilha: apontar com braço dobrado": [], "armadilha: braços pendurados": [],
+    # agachar-se: é a QUEDA na versão de simulação; nas regras normais não dispara nada
+    "agachado até ao chão (de cócoras)": ["QUEDA"] if SIM else [],
 }
 
 
 def main():
     ok = True
+    print(f"Regras: {RULES_PATH.name}\n")
     print(f"{'pose':40s} {'perto (1.0)':22s} {'longe (0.25)':22s}")
     for name, pts in poses().items():
         results = []

@@ -80,7 +80,9 @@ def load_class_mappings(yaml_path="labeling/global_rules.yaml"):
 import math
 
 NOSE, L_SH, R_SH, L_EL, R_EL, L_WR, R_WR, L_HIP, R_HIP = 0, 5, 6, 7, 8, 9, 10, 11, 12
-BODY_RULE_KEYS = ("torso_angle_min", "bbox_aspect_min", "wrists_above_nose", "arm_extended")
+L_ANK, R_ANK = 15, 16
+BODY_RULE_KEYS = ("torso_angle_min", "bbox_aspect_min", "wrists_above_nose", "arm_extended",
+                  "hip_to_ankle_max")
 
 
 def _kp(kpts, i, min_conf):
@@ -132,6 +134,13 @@ def body_conditions_ok(kpts, bbox, cond, min_conf=0.3):
     if "bbox_aspect_min" in cond:
         x1, y1, x2, y2 = bbox
         if y2 - y1 <= 0 or (x2 - x1) / (y2 - y1) < cond["bbox_aspect_min"]:
+            return False
+
+    if "hip_to_ankle_max" in cond:
+        # Agachado / no chão: a anca desce até perto dos pés. Distância VERTICAL anca->tornozelo
+        # em comprimentos de tronco (de pé ~1.0; de cócoras ~0.4). Precisa dos pés visíveis.
+        ankle = _mid(_kp(kpts, L_ANK, min_conf), _kp(kpts, R_ANK, min_conf))
+        if not ankle or abs(ankle[1] - hip[1]) / torso > cond["hip_to_ankle_max"]:
             return False
 
     if "wrists_above_nose" in cond:

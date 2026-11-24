@@ -12,3 +12,5 @@ inventory.secrets.yaml
 experiments/
 # ROIs desenhadas no Mac (cada Pi tem as suas; não vão para o git)
 roi_selection/roi_*.yaml
+# ROIs de cada Pi (gravadas pelo video_server no Pi; não vão para o git)
+video_server/rois_url*.yaml

@@ -31,8 +31,9 @@ defaults:
   # | avg (média, baseline) | fallback (média + prioridade quando a margem é baixa)
   aggregation_method: rules
   # Regras locais (o que cada câmara vê). v1: labeling/rules.yaml | v2: labeling/rules_v2.yaml
+  # | v2 simulação (QUEDA = agachar-se até ao chão): labeling/rules_v2_sim.yaml
   # Tem de corresponder ao global_rules_template (mesmos labels).
-  local_rules: labeling/rules_v2.yaml
+  local_rules: labeling/rules_v2_sim.yaml
   video_path:
     - /dev/video0
   resolution:

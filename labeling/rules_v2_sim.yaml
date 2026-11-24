@@ -1,0 +1,38 @@
+# =====================================================================
+# REGRAS LOCAIS v2 — SIMULAÇÃO (gestos fáceis de encenar no escritório)
+# =====================================================================
+# Igual a labeling/rules_v2.yaml, exceto a QUEDA: em vez de deitar no chão, o gesto
+# substituto é AGACHAR-SE ATÉ AO CHÃO (de cócoras). Mesmos labels -> as regras globais
+# labeling/global_rules_v2.example.yaml servem para as duas versões.
+# Qual é usada: "local_rules" no inventory.yaml.
+#
+# Requisito: os PÉS têm de aparecer na imagem (a QUEDA usa os tornozelos).
+# No artigo: descrever a QUEDA como "gesto substituto (agachamento) para simular uma queda".
+# =====================================================================
+
+kpt_conf_min: 0.3
+
+regras:
+
+  - nome: "Queda (simulada: agachado até ao chão)"
+    label: "QUEDA"
+    prioridade: 1
+    condicoes:
+      confidence_min: 0.5
+      hip_to_ankle_max: 0.5      # anca a menos de 0.5 troncos acima dos pés (de pé ~1.0)
+
+  - nome: "Pedido de Auxílio"
+    label: "SINAL_SOS"
+    prioridade: 2
+    condicoes:
+      confidence_min: 0.5
+      wrists_above_nose: 0.1     # os DOIS pulsos acima do nariz
+
+  - nome: "Alcance de Zona de Risco"
+    label: "BRACO_ESTENDIDO"
+    prioridade: 3
+    condicoes:
+      confidence_min: 0.5
+      arm_extended:
+        elbow_angle_min: 150
+        reach_min: 0.8

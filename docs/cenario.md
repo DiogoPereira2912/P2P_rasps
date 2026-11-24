@@ -66,6 +66,12 @@ versão em uso escolhe-se no `inventory.yaml` (`local_rules` e `global_rules_tem
   câmara fica encurtado na imagem e pode não disparar nessa câmara — outra câmara com outro
   ângulo vê-o (bom exemplo da colaboração entre câmaras para o artigo).
 
+**Versão de simulação** (`labeling/rules_v2_sim.yaml`, a usada por defeito no `inventory.yaml`):
+igual à v2, mas a **QUEDA é agachar-se até ao chão** (de cócoras) em vez de deitar — mais fácil de
+encenar no escritório. Deteção: distância vertical anca→tornozelo ≤ 0.5 × tronco. **Os pés têm de
+aparecer na imagem.** No artigo, descrever como "gesto substituto para simular uma queda".
+Teste: `python3 labeling/test_rules_v2.py labeling/rules_v2_sim.yaml`.
+
 **Armadilhas a encenar** (não devem disparar): baixar-se para apanhar uma caixa, levantar só um
 braço, apontar com o braço dobrado.
 

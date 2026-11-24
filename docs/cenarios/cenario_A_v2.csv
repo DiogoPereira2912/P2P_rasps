@@ -1,7 +1,7 @@
 inicio_s,fim_s,acao,zona,n_camaras,esperado_min_nos_2,instrucao
 0,20,VAZIO,-,0,SAFE,Ninguém do guião no campo de visão
 20,35,PRESENCA,A,2,SAFE,Caminhar/trabalhar normalmente na zona A (sem gestos)
-35,50,QUEDA,A,2,QUEDA,Deitar no tapete de lado para as câmaras
+35,50,QUEDA,A,2,QUEDA,Agachar-se até ao chão, de cócoras (rules_v2_sim) / deitar no tapete (rules_v2)
 50,60,VAZIO,-,0,SAFE,Levantar e sair do campo de visão
 60,75,ARM_CAIXA,A,2,SAFE,ARMADILHA: baixar-se para apanhar uma caixa (sem deitar)
 75,85,VAZIO,-,0,SAFE,Sair do campo de visão
@@ -13,7 +13,7 @@ inicio_s,fim_s,acao,zona,n_camaras,esperado_min_nos_2,instrucao
 150,160,VAZIO,-,0,SAFE,Sair do campo de visão
 160,175,ARM_APONTAR,A,2,SAFE,ARMADILHA: apontar com o braço meio dobrado
 175,185,VAZIO,-,0,SAFE,Sair do campo de visão
-185,200,QUEDA,D,1,QUEDA,Deitar no tapete na zona vista por 1 câmara (min_nos 1: deve dar QUEDA)
+185,200,QUEDA,D,1,QUEDA,Agachar-se até ao chão na zona de 1 câmara (min_nos 1: deve dar QUEDA)
 200,210,VAZIO,-,0,SAFE,Levantar e sair do campo de visão
 210,225,SOS,D,1,SAFE,Dois braços acima da cabeça na zona de 1 câmara (min_nos 2: SAFE)
 225,235,VAZIO,-,0,SAFE,Sair do campo de visão
