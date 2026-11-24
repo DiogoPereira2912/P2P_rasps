@@ -82,13 +82,25 @@ def build_node_config(name, node, defaults, all_ids):
     return cfg
 
 
-def build_global_rules():
+def build_global_rules(template=GLOBAL_RULES_TEMPLATE):
     """
     As regras globais descrevem o shop floor (todas as câmaras), por isso são iguais
     em todos os nós: copia o template tal como está.
     """
-    with open(GLOBAL_RULES_TEMPLATE) as f:
+    with open(template) as f:
         return yaml.safe_load(f)
+
+
+def check_rules_match(inv):
+    """As regras locais e globais têm de usar os mesmos labels (senão o GT e o consenso falham)."""
+    local_path = ROOT / inv["defaults"].get("local_rules", "labeling/rules.yaml")
+    global_path = ROOT / inv.get("global_rules_template", GLOBAL_RULES_TEMPLATE)
+    local = {r["label"] for r in yaml.safe_load(open(local_path))["regras"]}
+    glob_ = {r["label"] for r in yaml.safe_load(open(global_path))["regras"]}
+    if local != glob_:
+        sys.exit(f"❌ Labels diferentes entre {local_path.name} {sorted(local)} e {global_path.name} {sorted(glob_)}")
+    print(f"📜 Regras: {local_path.relative_to(ROOT)} + {global_path.relative_to(ROOT)} ({', '.join(sorted(local))})")
+    return global_path
 
 
 def write_yaml(path, data):
@@ -128,6 +140,7 @@ def main():
     inv = load_inventory()
     nodes = inv["nodes"]
     validate(nodes)
+    global_template = check_rules_match(inv)
 
     if BUILD.exists():
         shutil.rmtree(BUILD)
@@ -139,7 +152,7 @@ def main():
         node_dir = BUILD / "nodes" / name
         write_yaml(node_dir / "client" / "config.yaml",
                    build_node_config(name, node, inv["defaults"], all_ids))
-        write_yaml(node_dir / "labeling" / "global_rules.yaml", build_global_rules())
+        write_yaml(node_dir / "labeling" / "global_rules.yaml", build_global_rules(global_template))
         print(f"✅ {name:8s} {node['ip']:15s} node_id={node['node_id']}")
 
     with open(BUILD / "nodes.txt", "w") as f:

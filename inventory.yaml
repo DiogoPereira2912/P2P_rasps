@@ -11,6 +11,11 @@
 ssh_user: aidi
 remote_path: /home/aidi/P2P
 
+# --- Regras em uso (as versões anteriores ficam no repo; mudar aqui para voltar) ---
+#   v1: labeling/global_rules.example.yaml  (6 classes)
+#   v2: labeling/global_rules_v2.example.yaml (QUEDA, SINAL_SOS, BRACO_ESTENDIDO)
+global_rules_template: labeling/global_rules_v2.example.yaml
+
 # --- Valores comuns a todos os nós (vão para client/config.yaml) ---
 defaults:
   mosquitto_port: 1884
@@ -25,6 +30,9 @@ defaults:
   # Consenso no aggregation: rules (mesmo critério do ground truth, global_rules.yaml)
   # | avg (média, baseline) | fallback (média + prioridade quando a margem é baixa)
   aggregation_method: rules
+  # Regras locais (o que cada câmara vê). v1: labeling/rules.yaml | v2: labeling/rules_v2.yaml
+  # Tem de corresponder ao global_rules_template (mesmos labels).
+  local_rules: labeling/rules_v2.yaml
   video_path:
     - /dev/video0
   resolution:

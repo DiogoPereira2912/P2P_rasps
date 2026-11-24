@@ -1,0 +1,31 @@
+# =====================================================================
+# REGRAS GLOBAIS v2 — estado do shop floor, iguais em TODOS os nós
+# =====================================================================
+# Versão anterior (6 classes): labeling/global_rules.example.yaml (mantida).
+# Qual é usada: "global_rules_template" no inventory.yaml. O tools/gen_configs.py copia-a
+# para cada nó como labeling/global_rules.yaml.
+#
+# Usadas no ground truth (labeler) e no consenso (aggregation), com o mesmo critério:
+#   - GT:       a regra dispara se >= min_nos nós tiverem a coluna <label>_<nó> = 1
+#   - consenso: a regra dispara se >= min_nos nós tiverem probabilidade >= prob_threshold
+# Entre as que disparam vence a de MAIOR prioridade (número mais baixo); nenhuma -> SAFE.
+# Os labels têm de ser iguais aos das regras locais (labeling/rules_v2.yaml).
+# =====================================================================
+
+min_nos_default: 2     # por defeito, 2 câmaras têm de confirmar
+prob_threshold: 0.5    # probabilidade a partir da qual um nó "vê" a classe (só no consenso)
+
+regras:
+
+  - nome: "Queda"
+    label: "QUEDA"
+    prioridade: 1
+    min_nos: 1           # crítica: basta 1 câmara (a pessoa pode estar tapada nas outras)
+
+  - nome: "Pedido de Auxílio"
+    label: "SINAL_SOS"
+    prioridade: 2        # usa min_nos_default (2): gesto voluntário, confirmação reduz falsos alarmes
+
+  - nome: "Alcance de Zona de Risco"
+    label: "BRACO_ESTENDIDO"
+    prioridade: 3        # usa min_nos_default (2)

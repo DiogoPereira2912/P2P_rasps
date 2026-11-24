@@ -11,13 +11,16 @@ from labeling_utils import (
     process_labelled_df,
     load_class_mappings,
     status_from_votes,
+    body_conditions_ok,
+    BODY_RULE_KEYS,
+    frame_level,
 )
 from metrics import MetricsAnalyzer
 from prometheus_client import start_http_server
 
 PROMETHEUS_PORT = 8003  # tráfego MQTT do labeler (troca de datasets entre nós)
 
-RULES_LOCAL_PATH = "labeling/rules.yaml"
+RULES_LOCAL_PATH = "labeling/rules.yaml"  # default; o inventory escolhe com "local_rules"
 RULES_GLOBAL_PATH = "labeling/global_rules.yaml"
 
 
@@ -27,14 +30,18 @@ class Labeller:
         self.device_id = device_id
 
         # --- Configs ---
-        with open(RULES_LOCAL_PATH, "r") as file:
+        with open("client/config.yaml", "r") as file:
+            self.config = load(file, Loader=Loader)
+
+        # Regras locais: ficheiro escolhido no inventory.yaml ("local_rules"),
+        # ex: labeling/rules_v2.yaml. Sem essa chave usa a versão antiga (rules.yaml).
+        rules_path = self.config.get("local_rules", RULES_LOCAL_PATH)
+        with open(rules_path, "r") as file:
             self.rules = load(file, Loader=Loader)
+        print(f"📜 Regras locais: {rules_path}")
 
         with open(RULES_GLOBAL_PATH, "r") as file:
             self.global_rules = load(file, Loader=Loader)
-
-        with open("client/config.yaml", "r") as file:
-            self.config = load(file, Loader=Loader)
 
         # --- Rede ---
         self.mosquitto_port = self.config["mosquitto_port"]
@@ -162,6 +169,12 @@ class Labeller:
             dist = np.sqrt((pa[0] - pb[0]) ** 2 + (pa[1] - pb[1]) ** 2)
             if dist > max_dist:
                 return 0
+        # Condições v2 (rules_v2.yaml): pose independente da distância à câmara
+        if any(k in condicoes for k in BODY_RULE_KEYS):
+            bbox = (row.get("box_x1", 0), row.get("box_y1", 0), row.get("box_x2", 0), row.get("box_y2", 0))
+            kpt_conf = self.rules.get("kpt_conf_min", 0.3)
+            if not body_conditions_ok(row.get("keypoints", []), bbox, condicoes, kpt_conf):
+                return 0
         return 1
 
     def apply_binary_labels(self, row, rules, device_id):
@@ -216,6 +229,8 @@ class Labeller:
             )
             binary_df = pd.DataFrame(binary_cols.tolist(), index=df_working.index)
             df_labelled = pd.concat([df_working[["ts"]], binary_df], axis=1)
+            # Várias pessoas no frame -> 1 linha por frame (regra a 1 se alguém a cumprir)
+            df_labelled = frame_level(df_labelled)
 
             # 3. Gravar Labelled locais
             # try:
@@ -290,6 +305,8 @@ class Labeller:
             )
             binary_df = pd.DataFrame(binary_cols.tolist(), index=df_working.index)
             df_labelled = pd.concat([df_working[["ts"]], binary_df], axis=1)
+            # Várias pessoas no frame -> 1 linha por frame (regra a 1 se alguém a cumprir)
+            df_labelled = frame_level(df_labelled)
             df_labelled["ts"] = df_labelled["ts"].astype(str)
             df_labelled_inf = df_labelled.to_dict(orient="records")
             payload = {

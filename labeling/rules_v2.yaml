@@ -1,0 +1,46 @@
+# =====================================================================
+# REGRAS LOCAIS v2 — o que cada câmara vê (gera as colunas <label>_<nó> = 0/1)
+# =====================================================================
+# Versão anterior (6 classes, distâncias em píxeis): labeling/rules.yaml (mantida).
+# Qual é usada: "local_rules" no inventory.yaml.
+#
+# Todas as condições de pose são INDEPENDENTES DA DISTÂNCIA À CÂMARA: usam ângulos ou
+# distâncias divididas pelo comprimento do tronco (meio dos ombros -> meio das ancas).
+# Uma regra dispara se TODAS as suas condições se verificarem. Com várias pessoas no mesmo
+# frame, a câmara dispara a regra se PELO MENOS UMA pessoa a cumprir.
+#
+# Keypoints COCO: 0 nariz, 5/6 ombro esq/dir, 7/8 cotovelo, 9/10 pulso, 11/12 anca.
+# Keypoints com confiança < kpt_conf_min são ignorados (a regra não dispara sem eles).
+# =====================================================================
+
+kpt_conf_min: 0.3
+
+regras:
+
+  - nome: "Queda"
+    label: "QUEDA"
+    prioridade: 1
+    condicoes:
+      confidence_min: 0.5
+      # tronco deitado: ângulo (ombros -> ancas) em relação à vertical
+      torso_angle_min: 60        # graus (0 = de pé, 90 = deitado)
+      # corpo mais largo do que alto na imagem (distingue de baixar-se para apanhar uma caixa)
+      bbox_aspect_min: 1.0       # largura / altura da bounding box
+
+  - nome: "Pedido de Auxílio"
+    label: "SINAL_SOS"
+    prioridade: 2
+    condicoes:
+      confidence_min: 0.5
+      # os DOIS pulsos acima do nariz (levantar só um braço não dispara)
+      wrists_above_nose: 0.1     # margem mínima, em comprimentos de tronco
+
+  - nome: "Alcance de Zona de Risco"
+    label: "BRACO_ESTENDIDO"
+    prioridade: 3
+    condicoes:
+      confidence_min: 0.5
+      # pelo menos um braço esticado para a frente/lado (não para cima nem pendurado)
+      arm_extended:
+        elbow_angle_min: 150     # graus no cotovelo (180 = braço completamente reto)
+        reach_min: 0.8           # distância horizontal pulso-ombro, em comprimentos de tronco
